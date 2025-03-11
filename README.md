@@ -106,6 +106,189 @@ Specialized parser for 837 healthcare claims:
 - `billing_provider` - Information about the billing provider
 - `subscriber_loops` - List of subscriber information, patients, and claims
 
+### Example
+```
+ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *230101*1200*^*00501*000000001*0*P*:~
+GS*HC*SENDER*RECEIVER*20230101*1200*1*X*005010X223A2~
+ST*837*0001*005010X223A2~
+BHT*0019*00*123*20230101*1200*CH~
+NM1*41*2*HOSPITAL INC*****46*123456789~
+PER*IC*CONTACT*TE*5551234~
+NM1*40*2*INSURANCE CO*****46*987654321~
+HL*1**20*1~
+NM1*85*2*GENERAL HOSPITAL*****XX*1234567890~
+N3*555 HOSPITAL DRIVE~
+N4*SOMECITY*CA*90001~
+REF*EI*987654321~
+HL*2*1*22*1~
+SBR*P*18*******MB~
+NM1*IL*1*PATIENT*JOHN****MI*123456789A~
+N3*123 PATIENT ST~
+N4*SOMECITY*CA*90001~
+DMG*D8*19500501*M~
+CLM*4567832*25000.00***11:B:1*Y*A*Y*Y*A::1*Y*::3~
+DTP*434*RD8*20221201-20221210~
+HI*ABK:I269*ABF:I4891*ABF:E119*ABF:Z9911~
+HI*BE:01:::450.00*BE:02:::600.00*BE:30:::120.00~
+HI*BH:A1:D8:20221201*BH:A2:D8:20221130*BH:45:D8:20221201~
+HI*BI:70:D8:20221125-20221130*BI:71:D8:20221101-20221110~
+LX*1~
+SV2*0120*HC:99231*15000.00*UN*10***1~
+DTP*472*D8*20221201~
+LX*2~
+SV2*0270*HC:85025*500.00*UN*5***2~
+DTP*472*D8*20221202~
+LX*3~
+SV2*0450*HC:99291*9500.00*UN*1***3~
+DTP*472*D8*20221205~
+SE*31*0001~
+GE*1*1~
+IEA*1*000000001~
+```
+
+The above 837 claim will yeild the below json
+
+```json
+{
+    "transaction_type": "institutional",
+    "transaction_control_number": "005010X223A2",
+    "sender_id": "SENDER",
+    "receiver_id": "RECEIVER",
+    "subscriber_loops": [
+        {
+            "hl_id": "2",
+            "sbr_payer_responsibility": "P",
+            "sbr_individual_relationship": "18",
+            "sbr_reference_id": "",
+            "sbr_claim_filing_code": "MB",
+            "patients": [
+                {
+                    "entity_type": "person",
+                    "last_name": "PATIENT",
+                    "first_name": "JOHN",
+                    "birth_date": "19500501",
+                    "gender": "M"
+                }
+            ],
+            "claims": [
+                {
+                    "claim_id": "4567832",
+                    "total_charges": "25000.00",
+                    "place_of_service": "11",
+                    "occurrence_span_codes": [
+                        {
+                            "code": "70",
+                            "qualifier": "BI",
+                            "from_date": "20221125",
+                            "to_date": "20221130"
+                        },
+                        {
+                            "code": "71",
+                            "qualifier": "BI",
+                            "from_date": "20221101",
+                            "to_date": "20221110"
+                        }
+                    ],
+                    "occurrence_codes": [
+                        {
+                            "code": "A1",
+                            "date": "20221201",
+                            "qualifier": "BH"
+                        },
+                        {
+                            "code": "A2",
+                            "date": "20221130",
+                            "qualifier": "BH"
+                        },
+                        {
+                            "code": "45",
+                            "date": "20221201",
+                            "qualifier": "BH"
+                        }
+                    ],
+                    "value_codes": [
+                        {
+                            "code": "01",
+                            "amount": "450.00",
+                            "qualifier": "BE"
+                        },
+                        {
+                            "code": "02",
+                            "amount": "600.00",
+                            "qualifier": "BE"
+                        },
+                        {
+                            "code": "30",
+                            "amount": "120.00",
+                            "qualifier": "BE"
+                        }
+                    ],
+                    "condition_codes": [],
+                    "diagnosis_codes": [
+                        {
+                            "code": "I269",
+                            "qualifier": "ABK",
+                            "poa": ""
+                        },
+                        {
+                            "code": "I4891",
+                            "qualifier": "ABF",
+                            "poa": ""
+                        },
+                        {
+                            "code": "E119",
+                            "qualifier": "ABF",
+                            "poa": ""
+                        },
+                        {
+                            "code": "Z9911",
+                            "qualifier": "ABF",
+                            "poa": ""
+                        }
+                    ],
+                    "procedure_codes": [],
+                    "service_lines": [
+                        {
+                            "line_number": "1",
+                            "revenue_code": "0120",
+                            "procedure_type": "HC",
+                            "procedure_code": "99231",
+                            "modifiers": [],
+                            "charge_amount": "15000.00",
+                            "units": "10",
+                            "service_date": "20221201",
+                            "service_date_end": null
+                        },
+                        {
+                            "line_number": "2",
+                            "revenue_code": "0270",
+                            "procedure_type": "HC",
+                            "procedure_code": "85025",
+                            "modifiers": [],
+                            "charge_amount": "500.00",
+                            "units": "5",
+                            "service_date": "20221202",
+                            "service_date_end": null
+                        },
+                        {
+                            "line_number": "3",
+                            "revenue_code": "0450",
+                            "procedure_type": "HC",
+                            "procedure_code": "99291",
+                            "modifiers": [],
+                            "charge_amount": "9500.00",
+                            "units": "1",
+                            "service_date": "20221205",
+                            "service_date_end": null
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+```
+
 ## License
 
 [MIT License](https://opensource.org/licenses/MIT)
