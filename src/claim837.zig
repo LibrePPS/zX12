@@ -83,8 +83,8 @@ pub const Claim837 = struct {
     }
 
     pub fn deinit(self: *Claim837) void {
-        for (self.subscriber_loops.items) |*loop| {
-            loop.deinit();
+        for (0..self.subscriber_loops.items.len) |loop| {
+            self.subscriber_loops.items[loop].deinit();
         }
         self.subscriber_loops.deinit();
     }
@@ -100,7 +100,7 @@ pub const Claim837 = struct {
         if (st_segment.elements.items.len < 2) return x12.X12Error.InvalidSegment;
 
         const transaction_id = st_segment.elements.items[0].value;
-        self.transaction_control_number = try self.allocator.dupe(u8, if (st_segment.elements.items.len > 2) st_segment.elements.items[2].value else "");
+        self.transaction_control_number = if (st_segment.elements.items.len > 2) st_segment.elements.items[2].value else "";
 
         // Determine transaction type
         if (!std.mem.eql(u8, transaction_id, "837")) {
@@ -129,13 +129,13 @@ pub const Claim837 = struct {
         while (stop > 0 and isa_segment.elements.items[5].value[stop - 1] == ' ') {
             stop -= 1;
         }
-        self.sender_id = try self.allocator.dupe(u8, isa_segment.elements.items[5].value[0..stop]);
+        self.sender_id = isa_segment.elements.items[5].value[0..stop];
 
         stop = isa_segment.elements.items[7].value.len;
         while (stop > 0 and isa_segment.elements.items[7].value[stop - 1] == ' ') {
             stop -= 1;
         }
-        self.receiver_id = try self.allocator.dupe(u8, isa_segment.elements.items[7].value[0..stop]);
+        self.receiver_id = isa_segment.elements.items[7].value[0..stop];
 
         // Start processing hierarchical loops
         try self.parseHierarchicalStructure(document);
@@ -190,20 +190,18 @@ pub const Claim837 = struct {
     // New function to create patient info from subscriber when they are the same person
     fn createPatientFromSubscriber(self: *Claim837, document: *const x12.X12Document, subscriber_loop: *SubscriberLoop) !void {
         var patient_info = PatientInfo.init(self.allocator);
-        errdefer patient_info.deinit();
-
         // Copy subscriber information to patient
         patient_info.entity_type = subscriber_loop.subscriber.entity_type;
-        patient_info.last_name = try self.allocator.dupe(u8, subscriber_loop.subscriber.last_name);
-        patient_info.first_name = try self.allocator.dupe(u8, subscriber_loop.subscriber.first_name);
+        patient_info.last_name = subscriber_loop.subscriber.last_name;
+        patient_info.first_name = subscriber_loop.subscriber.first_name;
 
         // Parse DMG segment for patient demographics
         if (document.getSegment("DMG")) |dmg_segment| {
             if (dmg_segment.elements.items.len > 1) {
-                patient_info.birth_date = try self.allocator.dupe(u8, dmg_segment.elements.items[1].value);
+                patient_info.birth_date = dmg_segment.elements.items[1].value;
             }
             if (dmg_segment.elements.items.len > 2) {
-                patient_info.gender = try self.allocator.dupe(u8, dmg_segment.elements.items[2].value);
+                patient_info.gender = dmg_segment.elements.items[2].value;
             }
         }
 
@@ -225,16 +223,16 @@ pub const Claim837 = struct {
                     .organization;
 
                 if (nm1_segment.elements.items.len > 3) {
-                    self.billing_provider.last_name = try self.allocator.dupe(u8, nm1_segment.elements.items[2].value);
+                    self.billing_provider.last_name = nm1_segment.elements.items[2].value;
                 }
 
                 if (nm1_segment.elements.items.len > 4) {
-                    self.billing_provider.first_name = try self.allocator.dupe(u8, nm1_segment.elements.items[3].value);
+                    self.billing_provider.first_name = nm1_segment.elements.items[3].value;
                 }
 
                 if (nm1_segment.elements.items.len > 8) {
-                    self.billing_provider.id_qualifier = try self.allocator.dupe(u8, nm1_segment.elements.items[7].value);
-                    self.billing_provider.id = try self.allocator.dupe(u8, nm1_segment.elements.items[8].value);
+                    self.billing_provider.id_qualifier = nm1_segment.elements.items[7].value;
+                    self.billing_provider.id = nm1_segment.elements.items[8].value;
                 }
 
                 break;
@@ -244,22 +242,22 @@ pub const Claim837 = struct {
         // Parse N3 and N4 segments for address info
         if (document.getSegment("N3")) |n3_segment| {
             if (n3_segment.elements.items.len > 0) {
-                self.billing_provider.address1 = try self.allocator.dupe(u8, n3_segment.elements.items[0].value);
+                self.billing_provider.address1 = n3_segment.elements.items[0].value;
             }
             if (n3_segment.elements.items.len > 1) {
-                self.billing_provider.address2 = try self.allocator.dupe(u8, n3_segment.elements.items[1].value);
+                self.billing_provider.address2 = n3_segment.elements.items[1].value;
             }
         }
 
         if (document.getSegment("N4")) |n4_segment| {
             if (n4_segment.elements.items.len > 0) {
-                self.billing_provider.city = try self.allocator.dupe(u8, n4_segment.elements.items[0].value);
+                self.billing_provider.city = n4_segment.elements.items[0].value;
             }
             if (n4_segment.elements.items.len > 1) {
-                self.billing_provider.state = try self.allocator.dupe(u8, n4_segment.elements.items[1].value);
+                self.billing_provider.state = n4_segment.elements.items[1].value;
             }
             if (n4_segment.elements.items.len > 2) {
-                self.billing_provider.zip = try self.allocator.dupe(u8, n4_segment.elements.items[2].value);
+                self.billing_provider.zip = n4_segment.elements.items[2].value;
             }
         }
     }
@@ -269,7 +267,7 @@ pub const Claim837 = struct {
         errdefer subscriber_loop.deinit();
 
         // Parse HL segment details
-        subscriber_loop.hl_id = try self.allocator.dupe(u8, hl_segment.elements.items[0].value);
+        subscriber_loop.hl_id = hl_segment.elements.items[0].value;
 
         // Parse subscriber demographics from NM1*IL segment
         var nm1_segments = try document.getSegments("NM1", self.allocator);
@@ -286,16 +284,16 @@ pub const Claim837 = struct {
                     .organization;
 
                 if (nm1_segment.elements.items.len > 3) {
-                    subscriber_loop.subscriber.last_name = try self.allocator.dupe(u8, nm1_segment.elements.items[2].value);
+                    subscriber_loop.subscriber.last_name = nm1_segment.elements.items[2].value;
                 }
 
                 if (nm1_segment.elements.items.len > 4) {
-                    subscriber_loop.subscriber.first_name = try self.allocator.dupe(u8, nm1_segment.elements.items[3].value);
+                    subscriber_loop.subscriber.first_name = nm1_segment.elements.items[3].value;
                 }
 
                 if (nm1_segment.elements.items.len > 8) {
-                    subscriber_loop.subscriber.id_qualifier = try self.allocator.dupe(u8, nm1_segment.elements.items[7].value);
-                    subscriber_loop.subscriber.id = try self.allocator.dupe(u8, nm1_segment.elements.items[8].value);
+                    subscriber_loop.subscriber.id_qualifier = nm1_segment.elements.items[7].value;
+                    subscriber_loop.subscriber.id = nm1_segment.elements.items[8].value;
                 }
 
                 break;
@@ -305,16 +303,16 @@ pub const Claim837 = struct {
         // Parse insurance info from SBR segment
         if (document.getSegment("SBR")) |sbr_segment| {
             if (sbr_segment.elements.items.len > 0) {
-                subscriber_loop.sbr_payer_responsibility = try self.allocator.dupe(u8, sbr_segment.elements.items[0].value);
+                subscriber_loop.sbr_payer_responsibility = sbr_segment.elements.items[0].value;
             }
             if (sbr_segment.elements.items.len > 1) {
-                subscriber_loop.sbr_individual_relationship = try self.allocator.dupe(u8, sbr_segment.elements.items[1].value);
+                subscriber_loop.sbr_individual_relationship = sbr_segment.elements.items[1].value;
             }
             if (sbr_segment.elements.items.len > 2) {
-                subscriber_loop.sbr_reference_id = try self.allocator.dupe(u8, sbr_segment.elements.items[2].value);
+                subscriber_loop.sbr_reference_id = sbr_segment.elements.items[2].value;
             }
             if (sbr_segment.elements.items.len > 8) {
-                subscriber_loop.sbr_claim_filing_code = try self.allocator.dupe(u8, sbr_segment.elements.items[8].value);
+                subscriber_loop.sbr_claim_filing_code = sbr_segment.elements.items[8].value;
             }
         }
 
@@ -334,7 +332,6 @@ pub const Claim837 = struct {
         if (subscriber_loop == null) return;
 
         var patient_info = PatientInfo.init(self.allocator);
-        errdefer patient_info.deinit();
 
         // Parse patient demographics from NM1*QC segment
         var nm1_segments = try document.getSegments("NM1", self.allocator);
@@ -350,11 +347,11 @@ pub const Claim837 = struct {
                     .organization;
 
                 if (nm1_segment.elements.items.len > 3) {
-                    patient_info.last_name = try self.allocator.dupe(u8, nm1_segment.elements.items[3].value);
+                    patient_info.last_name = nm1_segment.elements.items[3].value;
                 }
 
                 if (nm1_segment.elements.items.len > 4) {
-                    patient_info.first_name = try self.allocator.dupe(u8, nm1_segment.elements.items[4].value);
+                    patient_info.first_name = nm1_segment.elements.items[4].value;
                 }
 
                 break;
@@ -364,10 +361,10 @@ pub const Claim837 = struct {
         // Parse DMG segment for patient demographics
         if (document.getSegment("DMG")) |dmg_segment| {
             if (dmg_segment.elements.items.len > 2) {
-                patient_info.birth_date = try self.allocator.dupe(u8, dmg_segment.elements.items[2].value);
+                patient_info.birth_date = dmg_segment.elements.items[2].value;
             }
             if (dmg_segment.elements.items.len > 3) {
-                patient_info.gender = try self.allocator.dupe(u8, dmg_segment.elements.items[3].value);
+                patient_info.gender = dmg_segment.elements.items[3].value;
             }
         }
 
@@ -396,14 +393,14 @@ pub const Claim837 = struct {
             errdefer claim.deinit();
 
             // Parse basic claim information
-            claim.claim_id = try self.allocator.dupe(u8, clm_segment.elements.items[0].value);
-            claim.total_charges = try self.allocator.dupe(u8, clm_segment.elements.items[1].value);
+            claim.claim_id = clm_segment.elements.items[0].value;
+            claim.total_charges = clm_segment.elements.items[1].value;
 
             // Find place of service
             if (clm_segment.elements.items.len > 4) {
                 const place_info = clm_segment.elements.items[4];
                 if (place_info.components.items.len > 0) {
-                    claim.place_of_service = try self.allocator.dupe(u8, place_info.components.items[0]);
+                    claim.place_of_service = place_info.components.items[0];
                 }
             }
 
@@ -425,21 +422,19 @@ pub const Claim837 = struct {
                             const qualifier = element.components.items[0];
                             //Process Diagnosis Codes
                             if (DxTypes.getIndex(qualifier) != null) {
-                                var diag = DiagnosisCode.init(self.allocator);
-                                errdefer diag.deinit();
-                                diag.qualifier = try self.allocator.dupe(u8, element.components.items[0]);
+                                var diag = DiagnosisCode.init();
+                                diag.qualifier = element.components.items[0];
                                 // Get diagnosis code
-                                diag.code = try self.allocator.dupe(u8, element.components.items[1]);
+                                diag.code = element.components.items[1];
                                 if (element.components.items.len > 4) {
-                                    diag.poa = try self.allocator.dupe(u8, element.components.items[8]);
+                                    diag.poa = element.components.items[8];
                                 }
                                 try claim.diagnosis_codes.append(diag);
                             } else if (PxTypes.getIndex(qualifier) != null) { //Process ICD Procedure Codes
-                                var proc = ProcedureCode.init(self.allocator);
-                                errdefer proc.deinit();
-                                proc.qualifier = try self.allocator.dupe(u8, element.components.items[0]);
+                                var proc = ProcedureCode.init();
+                                proc.qualifier = element.components.items[0];
                                 // Get procedure code
-                                proc.code = try self.allocator.dupe(u8, element.components.items[1]);
+                                proc.code = element.components.items[1];
                                 try claim.procedure_codes.append(proc);
                             } else { //Process  all other Health Information Codes
                                 const hi_type = std.meta.stringToEnum(HiTypes, qualifier) orelse continue;
@@ -495,7 +490,7 @@ pub const Claim837 = struct {
         errdefer service_line.deinit();
 
         // Get line number from LX segment
-        service_line.line_number = try self.allocator.dupe(u8, segments[0].elements.items[0].value);
+        service_line.line_number = segments[0].elements.items[0].value;
 
         // Find the SV1 or SV2 segment for this service line
         for (segments) |segment| {
@@ -504,14 +499,14 @@ pub const Claim837 = struct {
                 // Parse procedure code
                 if (segment.elements.items.len > 0) {
                     if (segment.elements.items[0].components.items.len > 1) {
-                        service_line.procedure_type = try self.allocator.dupe(u8, segment.elements.items[0].components.items[0]);
-                        service_line.procedure_code = try self.allocator.dupe(u8, segment.elements.items[0].components.items[1]);
+                        service_line.procedure_type = segment.elements.items[0].components.items[0];
+                        service_line.procedure_code = segment.elements.items[0].components.items[1];
                     }
                     if (segment.elements.items[0].components.items.len > 2) {
                         var mod_idx: usize = 2;
                         while (mod_idx < segment.elements.items[0].components.items.len and mod_idx <= 5) {
                             if (segment.elements.items[0].components.items[mod_idx].len > 0) {
-                                try service_line.modifiers.append(try self.allocator.dupe(u8, segment.elements.items[0].components.items[mod_idx]));
+                                try service_line.modifiers.append(segment.elements.items[0].components.items[mod_idx]);
                             }
                             mod_idx += 1;
                         }
@@ -519,29 +514,29 @@ pub const Claim837 = struct {
                 }
                 // Parse charge amount
                 if (segment.elements.items.len > 1) {
-                    service_line.charge_amount = try self.allocator.dupe(u8, segment.elements.items[1].value);
+                    service_line.charge_amount = segment.elements.items[1].value;
                 }
 
                 // Parse units - note this is the 4th element (index 3)
                 if (segment.elements.items.len > 3) {
-                    service_line.units = try self.allocator.dupe(u8, segment.elements.items[3].value);
+                    service_line.units = segment.elements.items[3].value;
                 }
 
                 break; // Only use the first SV1 segment for this service line
             } else if (std.mem.eql(u8, segment.id, "SV2")) {
                 // For SV2 (Institutional), procedure code is in element 1
                 // Parse procedure code
-                service_line.revenue_code = try self.allocator.dupe(u8, segment.elements.items[0].value);
+                service_line.revenue_code = segment.elements.items[0].value;
                 if (segment.elements.items.len > 1) {
                     if (segment.elements.items[1].components.items.len > 1) {
-                        service_line.procedure_type = try self.allocator.dupe(u8, segment.elements.items[1].components.items[0]);
-                        service_line.procedure_code = try self.allocator.dupe(u8, segment.elements.items[1].components.items[1]);
+                        service_line.procedure_type = segment.elements.items[1].components.items[0];
+                        service_line.procedure_code = segment.elements.items[1].components.items[1];
                     }
                     if (segment.elements.items[0].components.items.len > 2) {
                         var mod_idx: usize = 2;
                         while (mod_idx < segment.elements.items[0].components.items.len and mod_idx <= 5) {
                             if (segment.elements.items[0].components.items[mod_idx].len > 0) {
-                                try service_line.modifiers.append(try self.allocator.dupe(u8, segment.elements.items[0].components.items[mod_idx]));
+                                try service_line.modifiers.append(segment.elements.items[0].components.items[mod_idx]);
                             }
                             mod_idx += 1;
                         }
@@ -550,12 +545,12 @@ pub const Claim837 = struct {
 
                 // Parse charge amount
                 if (segment.elements.items.len > 2) {
-                    service_line.charge_amount = try self.allocator.dupe(u8, segment.elements.items[2].value);
+                    service_line.charge_amount = segment.elements.items[2].value;
                 }
 
                 // Parse units - note this is the 5th element (index 4) in SV2
                 if (segment.elements.items.len > 4) {
-                    service_line.units = try self.allocator.dupe(u8, segment.elements.items[4].value);
+                    service_line.units = segment.elements.items[4].value;
                 }
 
                 break; // Only use the first SV2 segment for this service line
@@ -567,15 +562,15 @@ pub const Claim837 = struct {
             if (std.mem.eql(u8, segment.id, "DTP") and segment.elements.items.len >= 3) {
                 // DTP*472 is service date
                 if (std.mem.eql(u8, segment.elements.items[0].value, "472")) {
-                    const service_date = try self.allocator.dupe(u8, segment.elements.items[2].value);
+                    const service_date = segment.elements.items[2].value;
                     if (std.mem.containsAtLeast(u8, service_date, 1, "-")) {
                         var date_iter = std.mem.splitAny(u8, service_date, "-");
-                        service_line.service_date = try self.allocator.dupe(u8, date_iter.first());
+                        service_line.service_date = date_iter.first();
                         if (date_iter.next()) |end_date| {
-                            service_line.service_date_end = try self.allocator.dupe(u8, end_date);
+                            service_line.service_date_end = end_date;
                         }
                     } else {
-                        service_line.service_date = try self.allocator.dupe(u8, service_date);
+                        service_line.service_date = service_date;
                     }
                     break;
                 }
@@ -606,18 +601,6 @@ const BillingProvider = struct {
     state: []const u8 = "",
     zip: []const u8 = "",
 
-    pub fn deinit(self: *BillingProvider, allocator: Allocator) void {
-        allocator.free(self.last_name);
-        allocator.free(self.first_name);
-        allocator.free(self.id_qualifier);
-        allocator.free(self.id);
-        allocator.free(self.address1);
-        allocator.free(self.address2);
-        allocator.free(self.city);
-        allocator.free(self.state);
-        allocator.free(self.zip);
-    }
-
     pub fn jsonStringify(self: anytype, out: anytype) !void {
         try utils.jsonStringify(self.*, out);
     }
@@ -629,13 +612,6 @@ const SubscriberInfo = struct {
     first_name: []const u8 = "",
     id_qualifier: []const u8 = "",
     id: []const u8 = "",
-
-    pub fn deinit(self: *SubscriberInfo, allocator: Allocator) void {
-        allocator.free(self.last_name);
-        allocator.free(self.first_name);
-        allocator.free(self.id_qualifier);
-        allocator.free(self.id);
-    }
 
     pub fn jsonStringify(self: anytype, out: anytype) !void {
         try utils.jsonStringify(self.*, out);
@@ -656,14 +632,6 @@ const PatientInfo = struct {
             .allocator = allocator,
         };
     }
-
-    pub fn deinit(self: *PatientInfo) void {
-        self.allocator.free(self.last_name);
-        self.allocator.free(self.first_name);
-        self.allocator.free(self.birth_date);
-        self.allocator.free(self.gender);
-    }
-
     pub fn jsonStringify(self: anytype, out: anytype) !void {
         try utils.jsonStringify(self.*, out);
     }
@@ -690,21 +658,6 @@ const ServiceLine = struct {
     }
 
     pub fn deinit(self: *ServiceLine) void {
-        self.allocator.free(self.line_number);
-        self.allocator.free(self.procedure_type);
-        if (self.revenue_code != null) {
-            self.allocator.free(self.revenue_code.?);
-        }
-        self.allocator.free(self.procedure_code);
-        self.allocator.free(self.charge_amount);
-        self.allocator.free(self.units);
-        self.allocator.free(self.service_date);
-        if (self.service_date_end != null) {
-            self.allocator.free(self.service_date_end.?);
-        }
-        for (0..self.modifiers.items.len) |idx| {
-            self.allocator.free(self.modifiers.items[idx]);
-        }
         self.modifiers.deinit();
     }
 
@@ -727,13 +680,6 @@ const OccurrenceSpanCode = struct {
         };
     }
 
-    pub fn deinit(self: *OccurrenceSpanCode) void {
-        self.allocator.free(self.code);
-        self.allocator.free(self.qualifier);
-        self.allocator.free(self.from_date);
-        self.allocator.free(self.to_date);
-    }
-
     pub fn jsonStringify(self: anytype, out: anytype) !void {
         try utils.jsonStringify(self.*, out);
     }
@@ -752,12 +698,6 @@ const OccurrenceCode = struct {
         };
     }
 
-    pub fn deinit(self: *OccurrenceCode) void {
-        self.allocator.free(self.code);
-        self.allocator.free(self.qualifier);
-        self.allocator.free(self.date);
-    }
-
     pub fn jsonStringify(self: anytype, out: anytype) !void {
         try utils.jsonStringify(self.*, out);
     }
@@ -774,12 +714,6 @@ const ValueCode = struct {
         return .{
             .allocator = allocator,
         };
-    }
-
-    pub fn deinit(self: *ValueCode) void {
-        self.allocator.free(self.code);
-        self.allocator.free(self.qualifier);
-        self.allocator.free(self.amount);
     }
 
     pub fn jsonStringify(self: anytype, out: anytype) !void {
@@ -815,42 +749,15 @@ const Claim = struct {
     }
 
     pub fn deinit(self: *Claim) void {
-        self.allocator.free(self.claim_id);
-        self.allocator.free(self.total_charges);
-        self.allocator.free(self.place_of_service);
-
-        for (self.occurrence_span_codes.items) |*occ| {
-            occ.deinit();
-        }
         self.occurrence_span_codes.deinit();
-
-        for (self.occurrence_codes.items) |*occ| {
-            occ.deinit();
-        }
         self.occurrence_codes.deinit();
-
-        for (self.value_codes.items) |*code| {
-            code.deinit();
-        }
         self.value_codes.deinit();
-
-        for (0..self.condition_codes.items.len) |idx| {
-            self.allocator.free(self.condition_codes.items[idx]);
-        }
         self.condition_codes.deinit();
-
-        for (self.diagnosis_codes.items) |*code| {
-            code.deinit();
-        }
         self.diagnosis_codes.deinit();
-
-        for (self.procedure_codes.items) |*code| {
-            code.deinit();
-        }
         self.procedure_codes.deinit();
 
-        for (self.service_lines.items) |*line| {
-            line.deinit();
+        for (0..self.service_lines.items.len) |line| {
+            self.service_lines.items[line].deinit();
         }
         self.service_lines.deinit();
     }
@@ -863,43 +770,40 @@ const Claim = struct {
         switch (hi_type) {
             .BI => {
                 var occ = OccurrenceSpanCode.init(self.allocator);
-                errdefer occ.deinit();
-                occ.qualifier = try self.allocator.dupe(u8, element.components.items[0]);
-                occ.code = try self.allocator.dupe(u8, element.components.items[1]);
+                occ.qualifier = element.components.items[0];
+                occ.code = element.components.items[1];
                 if (element.components.items.len > 3) {
-                    const from_date = try self.allocator.dupe(u8, element.components.items[3]);
+                    const from_date = element.components.items[3];
                     var date_iter = std.mem.splitAny(u8, from_date, "-");
-                    occ.from_date = try self.allocator.dupe(u8, date_iter.first());
+                    occ.from_date = date_iter.first();
                     if (date_iter.next()) |to_date| {
-                        occ.to_date = try self.allocator.dupe(u8, to_date);
+                        occ.to_date = to_date;
                     }
                 }
                 try self.occurrence_span_codes.append(occ);
             },
             .BH => {
                 var occ = OccurrenceCode.init(self.allocator);
-                errdefer occ.deinit();
-                occ.qualifier = try self.allocator.dupe(u8, element.components.items[0]);
-                occ.code = try self.allocator.dupe(u8, element.components.items[1]);
+                occ.qualifier = element.components.items[0];
+                occ.code = element.components.items[1];
                 if (element.components.items.len > 3) {
-                    occ.date = try self.allocator.dupe(u8, element.components.items[3]);
+                    occ.date = element.components.items[3];
                 }
                 try self.occurrence_codes.append(occ);
             },
             .BE => {
                 var val = ValueCode.init(self.allocator);
-                errdefer val.deinit();
-                val.qualifier = try self.allocator.dupe(u8, element.components.items[0]);
-                val.code = try self.allocator.dupe(u8, element.components.items[1]);
+                val.qualifier = element.components.items[0];
+                val.code = element.components.items[1];
                 // Value amount is typically in position 4
                 if (element.components.items.len > 3) {
-                    val.amount = try self.allocator.dupe(u8, element.components.items[4]);
+                    val.amount = element.components.items[4];
                 }
                 try self.value_codes.append(val);
             },
             .BG => {
                 if (element.components.items.len > 1) {
-                    try self.condition_codes.append(try self.allocator.dupe(u8, element.components.items[1]));
+                    try self.condition_codes.append(element.components.items[1]);
                 }
             },
         }
@@ -927,20 +831,9 @@ const SubscriberLoop = struct {
     }
 
     pub fn deinit(self: *SubscriberLoop) void {
-        self.allocator.free(self.hl_id);
-        self.subscriber.deinit(self.allocator);
-        self.allocator.free(self.sbr_payer_responsibility);
-        self.allocator.free(self.sbr_individual_relationship);
-        self.allocator.free(self.sbr_reference_id);
-        self.allocator.free(self.sbr_claim_filing_code);
-
-        for (self.patients.items) |*patient| {
-            patient.deinit();
-        }
         self.patients.deinit();
-
-        for (self.claims.items) |*claim| {
-            claim.deinit();
+        for (0..self.claims.items.len) |claim| {
+            self.claims.items[claim].deinit();
         }
         self.claims.deinit();
     }
@@ -955,18 +848,8 @@ const DiagnosisCode = struct {
     qualifier: []const u8 = "", // BK, BF, etc. - identifies primary vs secondary diagnoses
     poa: []const u8 = "", // Present on Admission indicator (Y, N, U, W, 1)
 
-    allocator: Allocator,
-
-    pub fn init(allocator: Allocator) DiagnosisCode {
-        return .{
-            .allocator = allocator,
-        };
-    }
-
-    pub fn deinit(self: *DiagnosisCode) void {
-        self.allocator.free(self.code);
-        self.allocator.free(self.qualifier);
-        self.allocator.free(self.poa);
+    pub fn init() DiagnosisCode {
+        return .{};
     }
 
     pub fn jsonStringify(self: anytype, out: anytype) !void {
@@ -978,17 +861,8 @@ const ProcedureCode = struct {
     code: []const u8 = "",
     qualifier: []const u8 = "",
 
-    allocator: Allocator,
-
-    pub fn init(allocator: Allocator) ProcedureCode {
-        return .{
-            .allocator = allocator,
-        };
-    }
-
-    pub fn deinit(self: *ProcedureCode) void {
-        self.allocator.free(self.code);
-        self.allocator.free(self.qualifier);
+    pub fn init() ProcedureCode {
+        return .{};
     }
 
     pub fn jsonStringify(self: anytype, out: anytype) !void {
@@ -1031,9 +905,7 @@ test "Parse 837P Professional Claim" {
         \\IEA*1*000000001~
     ;
 
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = std.testing.allocator;
 
     // Parse the X12 document
     var doc = x12.X12Document.init(allocator);
@@ -1094,9 +966,7 @@ test "Parse 837P Professional Claim - Comprehensive Test" {
         \\IEA*1*000000001~
     ;
 
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = std.testing.allocator;
 
     // Parse the X12 document
     var doc = x12.X12Document.init(allocator);
@@ -1223,11 +1093,7 @@ test "Parse 837I Institutional Claim with Value, Occurrence, and Span Codes" {
         \\GE*1*1~
         \\IEA*1*000000001~
     ;
-
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
+    const allocator = std.testing.allocator;
     // Parse the X12 document
     var doc = x12.X12Document.init(allocator);
     defer doc.deinit();
@@ -1472,10 +1338,7 @@ test "Parse Random sample" {
         \\GE*1*1770~
         \\IEA*1*000001770~
     ;
-
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = std.testing.allocator;
 
     // Parse the X12 document
     var doc = x12.X12Document.init(allocator);

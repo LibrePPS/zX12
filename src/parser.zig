@@ -46,8 +46,8 @@ pub const Segment = struct {
     }
 
     pub fn deinit(self: *Segment) void {
-        for (self.elements.items) |*element| {
-            element.deinit();
+        for (0..self.elements.items.len) |i| {
+            self.elements.items[i].deinit();
         }
         self.elements.deinit();
     }
@@ -78,8 +78,9 @@ pub const X12Document = struct {
     }
 
     pub fn deinit(self: *X12Document) void {
-        for (self.segments.items) |*segment| {
-            segment.deinit();
+        for (0..self.segments.items.len) |i| {
+            self.allocator.free(self.segments.items[i].id);
+            self.segments.items[i].deinit();
         }
         self.segments.deinit();
     }
@@ -168,7 +169,7 @@ pub const X12Document = struct {
         var element = Element.init(self.allocator);
         errdefer element.deinit();
 
-        element.value = try self.allocator.dupe(u8, element_data);
+        element.value = element_data;
 
         // Parse components if they exist
         var component_start: usize = 0;
@@ -176,7 +177,7 @@ pub const X12Document = struct {
 
         while (i < element_data.len) {
             if (element_data[i] == self.component_delimiter) {
-                try element.components.append(try self.allocator.dupe(u8, element_data[component_start..i]));
+                try element.components.append(element_data[component_start..i]);
                 component_start = i + 1;
             }
             i += 1;
@@ -184,7 +185,7 @@ pub const X12Document = struct {
 
         // Handle the last component if component delimiter was found
         if (element.components.items.len > 0 and component_start < element_data.len) {
-            try element.components.append(try self.allocator.dupe(u8, element_data[component_start..]));
+            try element.components.append(element_data[component_start..]);
         }
 
         try segment.elements.append(element);
