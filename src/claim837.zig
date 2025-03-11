@@ -6,13 +6,14 @@ const utils = @import("utils.zig");
 // Globals for shared library
 var ARENA = std.heap.ArenaAllocator.init(std.heap.c_allocator);
 const ALLOCATOR = ARENA.allocator();
+var BUFFER_MAP = std.AutoArrayHashMap(usize, []const u8).init(ALLOCATOR);
 //Exported C function to parse an 837 document
-export fn parse837(input: [*c]const u8, sz: usize) callconv(.C) [*c]const u8 {
-    _ = ARENA.reset(.free_all);
+export fn parse837(input: [*c]const u8, sz: c_int) callconv(.C) [*c]const u8 {
     //Parse the X12 document
     var document = x12.X12Document.init(ALLOCATOR);
     defer document.deinit();
-    document.parse(input[0..sz]) catch |err| {
+    document.parse(input[0..@as(usize, @intCast(sz))]) catch |err| {
+        std.log.debug("Error parsing X12 document", .{});
         return @ptrCast(std.fmt.allocPrint(ALLOCATOR, "Error parsing X12 document: {s}", .{@errorName(err)}) catch unreachable);
     };
 
@@ -20,14 +21,27 @@ export fn parse837(input: [*c]const u8, sz: usize) callconv(.C) [*c]const u8 {
     var claim = Claim837.init(ALLOCATOR);
     defer claim.deinit();
     claim.parse(&document) catch |err| {
+        std.log.debug("Error parsing 837 claim", .{});
         return @ptrCast(std.fmt.allocPrint(ALLOCATOR, "Error parsing 837 claim: {s}", .{@errorName(err)}) catch unreachable);
     };
 
     const j = std.json.stringifyAlloc(ALLOCATOR, claim, .{}) catch |err| {
         return @ptrCast(std.fmt.allocPrint(ALLOCATOR, "Error serializing JSON: {s}", .{@errorName(err)}) catch unreachable);
     };
-
+    BUFFER_MAP.put(@intFromPtr(j.ptr), j) catch unreachable;
     return @ptrCast(j);
+}
+
+export fn getBufferSz(ptr: [*c]const u8) callconv(.C) c_int {
+    const int = @intFromPtr(ptr);
+    const j = BUFFER_MAP.get(int) orelse return 0;
+    return @intCast(j.len);
+}
+
+export fn free837(ptr: [*c]const u8) callconv(.C) void {
+    const int = @intFromPtr(ptr);
+    const j = BUFFER_MAP.get(int) orelse return;
+    ALLOCATOR.free(j);
 }
 
 const DxTypes = std.StaticStringMap([]const u8).initComptime(&.{
