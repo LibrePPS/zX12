@@ -410,11 +410,14 @@ pub const Claim837 = struct {
             claim.claim_id = clm_segment.elements.items[0].value;
             claim.total_charges = clm_segment.elements.items[1].value;
 
-            // Find place of service
+            // Find billtype
             if (clm_segment.elements.items.len > 4) {
                 const place_info = clm_segment.elements.items[4];
                 if (place_info.components.items.len > 0) {
-                    claim.place_of_service = place_info.components.items[0];
+                    claim.bill_type = place_info.components.items[0];
+                }
+                if (place_info.components.items.len > 2) {
+                    claim.bill_type_freq = place_info.components.items[2];
                 }
             }
 
@@ -738,7 +741,8 @@ const ValueCode = struct {
 const Claim = struct {
     claim_id: []const u8 = "",
     total_charges: []const u8 = "",
-    place_of_service: []const u8 = "",
+    bill_type: []const u8 = "",
+    bill_type_freq: []const u8 = "",
     occurrence_span_codes: std.ArrayList(OccurrenceSpanCode),
     occurrence_codes: std.ArrayList(OccurrenceCode),
     value_codes: std.ArrayList(ValueCode),
@@ -1040,7 +1044,7 @@ test "Parse 837P Professional Claim - Comprehensive Test" {
     const claim_data = subscriber_loop.claims.items[0];
     try std.testing.expectEqualStrings("123456", claim_data.claim_id);
     try std.testing.expectEqualStrings("150.00", claim_data.total_charges);
-    try std.testing.expectEqualStrings("11", claim_data.place_of_service);
+    try std.testing.expectEqualStrings("11", claim_data.bill_type);
 
     // Check diagnosis codes
     try std.testing.expect(claim_data.diagnosis_codes.items.len > 0);
@@ -1203,6 +1207,10 @@ test "Parse 837I Institutional Claim with Value, Occurrence, and Span Codes" {
     try std.testing.expectEqualStrings("99291", line3.procedure_code);
     try std.testing.expectEqualStrings("9500.00", line3.charge_amount);
     try std.testing.expectEqualStrings("1", line3.units);
+
+    const j = try std.json.stringifyAlloc(allocator, claim, .{ .whitespace = .indent_2 });
+    defer allocator.free(j);
+    std.debug.print("JSON: {s}\n", .{j});
 }
 
 test "Parse Random sample" {
