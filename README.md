@@ -14,7 +14,7 @@ zX12 is a library for parsing X12 EDI (Electronic Data Interchange) documents, w
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/zX12.git
+git clone https://github.com/jjw07006/zX12.git
 cd zX12
 zig build
 ```
@@ -22,6 +22,7 @@ zig build
 ## Usage
 
 ### Basic X12 Document Parsing
+- Keep in mind the parser does minimal allocations, so the contents of the X12 document needs to outlive the Zig X12 Document structure and Claim837 structure.
 
 ```zig
 const std = @import("std");
@@ -81,31 +82,6 @@ pub fn main() !void {
         const json = try std.json.stringifyAlloc(allocator, claim, .{});
         defer allocator.free(json);
         std.debug.print("JSON: {s}\n", .{json});
-}
-```
-
-### Using from C
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-// Import the C-compatible function
-extern const char* parse837(const char* input, size_t size);
-
-int main() {
-        const char* x12_data = "ISA*00*..."; // Your X12 data here
-        
-        // Parse the X12 data
-        const char* json = parse837(x12_data, strlen(x12_data));
-        
-        // Use the resulting JSON
-        printf("Parsed claim: %s\n", json);
-        
-        // No need to free memory - handled by the arena allocator
-        
-        return 0;
 }
 ```
 
