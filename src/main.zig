@@ -2,140 +2,295 @@ const std = @import("std");
 const x12 = @import("parser.zig");
 const schema_parser = @import("schema_parser.zig");
 
-//@TODO - Clean this up and use a struct to hold everything, use a linked list to hold the schema and schema names
-const ALLOCATOR = std.heap.c_allocator;
-var SCHMEAS = std.StringArrayHashMap(schema_parser.Schema).init(ALLOCATOR);
-var SCHMEA_NAMES = std.StringArrayHashMap([]const u8).init(ALLOCATOR);
-var BUFFERS = std.AutoArrayHashMap(usize, usize).init(ALLOCATOR);
+// Handle-based design with proper error handling
+pub const ZX12_Error = enum(c_int) {
+    SUCCESS = 0,
+    INVALID_ARGUMENT = -1,
+    FILE_NOT_FOUND = -2,
+    MEMORY_ERROR = -3,
+    PARSE_ERROR = -4,
+    SCHEMA_NOT_FOUND = -5,
+    BUFFER_NOT_FOUND = -6,
+    UNKNOWN_ERROR = -99,
+};
 
-export fn loadSchema(path: [*c]const u8, name: [*c]const u8) callconv(.C) i8 {
-    const name_len = std.mem.len(name);
-    if (name_len == 0 or name_len >= 128) {
-        std.log.err("Please choose a name for the schema that is longer between 0 and 128 characters", .{});
-        return -1;
+// Context struct to replace globals
+pub const ZX12_Context = struct {
+    allocator: std.mem.Allocator,
+    schemas: std.StringArrayHashMap(schema_parser.Schema),
+    schema_names: std.StringArrayHashMap([]const u8),
+    buffers: std.AutoArrayHashMap(usize, []const u8),
+
+    pub fn init(allocator: std.mem.Allocator) !*ZX12_Context {
+        const ctx = try allocator.create(ZX12_Context);
+        ctx.* = ZX12_Context{
+            .allocator = allocator,
+            .schemas = std.StringArrayHashMap(schema_parser.Schema).init(allocator),
+            .schema_names = std.StringArrayHashMap([]const u8).init(allocator),
+            .buffers = std.AutoArrayHashMap(usize, []const u8).init(allocator),
+        };
+        return ctx;
     }
-    const path_len = std.mem.len(path);
-    if (path_len == 0 or path_len >= 256) {
-        std.log.err("Path is invalid length. Path length - {d}", .{path_len});
-        return -1;
+
+    pub fn deinit(self: *ZX12_Context) void {
+        // Free all schemas
+        var schema_it = self.schemas.iterator();
+        while (schema_it.next()) |entry| {
+            entry.value_ptr.deinit();
+        }
+        self.schemas.deinit();
+
+        // Free all schema names
+        var name_it = self.schema_names.iterator();
+        while (name_it.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*);
+        }
+        self.schema_names.deinit();
+
+        // Free all buffers
+        var buffer_it = self.buffers.iterator();
+        while (buffer_it.next()) |entry| {
+            self.allocator.free(entry.value_ptr.*);
+        }
+        self.buffers.deinit();
+
+        // Free the context itself
+        self.allocator.destroy(self);
     }
-    //Check the file exists
-    const file = std.fs.openFileAbsoluteZ(path, .{ .mode = .read_only }) catch |err| {
-        std.log.err("Error opening file {s}. Error - {any}", .{ path, err });
-        return -1;
+};
+
+// Exported C API functions
+export fn zx12_create_context() callconv(.C) ?*ZX12_Context {
+    const ctx = ZX12_Context.init(std.heap.c_allocator) catch {
+        return null;
     };
-    //Stat the file and get size
-    const file_stat = file.stat() catch |err| {
-        std.log.err("Could not stat file {s}. Error - {any}", .{ path, err });
-        return -1;
+    return ctx;
+}
+
+export fn zx12_destroy_context(ctx: ?*ZX12_Context) callconv(.C) void {
+    if (ctx) |context| {
+        context.deinit();
+    }
+}
+
+export fn zx12_load_schema(ctx: ?*ZX12_Context, path: [*c]const u8, path_len: usize, name: [*c]const u8, name_len: usize) callconv(.C) c_int {
+    if (ctx == null or path == null or name == null) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    const context = ctx.?;
+
+    if (name_len == 0 or name_len >= 128) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    if (path_len == 0 or path_len >= 4096) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    // Open and read file
+    const file = std.fs.openFileAbsoluteZ(path, .{ .mode = .read_only }) catch {
+        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
+    };
+    defer file.close();
+
+    const file_stat = file.stat() catch {
+        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
     };
 
     if (file_stat.size == 0) {
-        std.log.err("Schema file is empty!", .{});
-        return -1;
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
-    //Allocate space to read file to buffer
-    const buff = ALLOCATOR.alloc(u8, file_stat.size) catch {
-        std.log.err("Memory Allocation Failure!!", .{});
-        return -1;
+
+    // Read file contents
+    const buff = context.allocator.alloc(u8, file_stat.size) catch {
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    //Read contents to buffer
-    _ = file.readAll(buff) catch |err| {
-        std.log.err("Failed to read file contents. Error - {any}", .{err});
-        return -1;
+    defer context.allocator.free(buff);
+
+    _ = file.readAll(buff) catch {
+        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
     };
-    //Parse to Schema
-    const schema = schema_parser.Schema.fromJson(ALLOCATOR, buff) catch |err| {
-        std.log.err("Failed to parse Json to X12 Schemea. Error - {any}", .{err});
-        return -1;
+
+    // Parse schema
+    var schema = schema_parser.Schema.fromJson(context.allocator, buff) catch {
+        return @intFromEnum(ZX12_Error.PARSE_ERROR);
     };
-    //Add to hash map
-    const dup_name = ALLOCATOR.alloc(u8, name_len) catch {
-        std.log.err("Memory Allocation Failure!!", .{});
-        return -1;
+
+    // Copy the schema name
+    const schema_name = context.allocator.alloc(u8, name_len) catch {
+        schema.deinit();
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    @memcpy(dup_name, name[0..name_len]);
-    SCHMEAS.put(dup_name, schema) catch |err| {
-        std.log.err("Failed to add schema to hash map. Error - {any}", .{err});
-        return -1;
+    @memcpy(schema_name, name[0..name_len]);
+
+    // Store schema and name
+    context.schemas.put(schema_name, schema) catch {
+        context.allocator.free(schema_name);
+        schema.deinit();
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    //Add name to names hash map
-    SCHMEA_NAMES.put(dup_name, dup_name) catch |err| {
-        std.log.err("Failed to add schema name to hash map. Error - {any}", .{err});
-        return -1;
+
+    context.schema_names.put(schema_name, schema_name) catch {
+        _ = context.schemas.swapRemove(schema_name);
+        context.allocator.free(schema_name);
+        schema.deinit();
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    return 0;
+
+    return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn parseFromSchema(schema_name: [*c]const u8, x12_data: [*c]const u8) callconv(.C) [*c]const u8 {
-    const schema_name_len = std.mem.len(schema_name);
-    const schema = SCHMEAS.getPtr(schema_name[0..schema_name_len]) orelse {
-        std.log.err("Schema name {s} does not exist in Schema hash map", .{schema_name});
-        return "";
-    };
-    //Parse the x12 data
-    const x12_len = std.mem.len(x12_data);
-    if (x12_len == 0) {
-        std.log.err("X12 data given is empty!", .{});
-        return "";
+export fn zx12_parse_x12(
+    ctx: ?*ZX12_Context,
+    schema_name: [*c]const u8,
+    schema_name_len: usize,
+    x12_data: [*c]const u8,
+    x12_data_len: usize,
+    out_buffer_id: *isize,
+    out_length: *isize,
+) callconv(.C) c_int {
+    if (ctx == null or schema_name == null or x12_data == null) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
-    var document = x12.X12Document.init(ALLOCATOR);
-    defer document.deinit();
-    document.parse(x12_data[0..x12_len]) catch |err| {
-        std.log.err("Error while parsing the X12 data. Error - {any}", .{err});
-        return "";
+
+    const context = ctx.?;
+
+    if (schema_name_len == 0 or x12_data_len == 0) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    // Get schema
+    const schema = context.schemas.getPtr(schema_name[0..schema_name_len]) orelse {
+        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
     };
 
-    var parsed = schema_parser.parseWithSchema(ALLOCATOR, &document, schema) catch |err| {
-        std.log.err("Error parsing X12 with the Schema {s}. Error {any}", .{ schema_name, err });
-        return "";
+    // Parse x12 data
+    var document = x12.X12Document.init(context.allocator);
+    defer document.deinit();
+
+    document.parse(x12_data[0..x12_data_len]) catch {
+        return @intFromEnum(ZX12_Error.PARSE_ERROR);
+    };
+
+    // Process with schema
+    var parsed = schema_parser.parseWithSchema(context.allocator, &document, schema) catch {
+        return @intFromEnum(ZX12_Error.PARSE_ERROR);
     };
     defer parsed.deinit();
-    //Return JSON
-    const j = std.json.stringifyAlloc(ALLOCATOR, parsed.value, .{}) catch |err| {
-        std.log.err("Error while serializing to json. Error - {any}", .{err});
-        return "";
+
+    // Convert to JSON
+    const json_str = std.json.stringifyAlloc(context.allocator, parsed.value, .{}) catch {
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    BUFFERS.put(@intFromPtr(j.ptr), j.len) catch |err| {
-        std.log.err("Failed to add buffer to hash map. Error - {any}", .{err});
-        return "";
+
+    // Store in buffers map
+    const buffer_id = @intFromPtr(json_str.ptr);
+    context.buffers.put(buffer_id, json_str) catch {
+        context.allocator.free(json_str);
+        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
     };
-    return @ptrCast(j);
+
+    // Return buffer info
+    out_buffer_id.* = @intCast(buffer_id);
+    out_length.* = @intCast(json_str.len);
+
+    return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn getBufferSize(ptr: [*c]const u8) callconv(.C) usize {
-    const key = @intFromPtr(ptr);
-    const size = BUFFERS.get(key) orelse {
-        std.log.err("Buffer not found for key {d}", .{key});
-        return 0;
+export fn zx12_get_buffer_data(ctx: ?*ZX12_Context, buffer_id: usize, out_buffer: ?[*]u8, buffer_capacity: usize) callconv(.C) c_int {
+    if (ctx == null or out_buffer == null) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    const context = ctx.?;
+
+    // Get the buffer
+    const buffer = context.buffers.get(buffer_id) orelse {
+        return @intFromEnum(ZX12_Error.BUFFER_NOT_FOUND);
     };
-    return size;
+
+    if (buffer.len > buffer_capacity) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    // Copy data to provided buffer
+    @memcpy(out_buffer.?[0..buffer.len], buffer);
+
+    return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn freeSchema(name: [*c]const u8) callconv(.C) i8 {
-    const name_len = std.mem.len(name);
-    const schema = SCHMEAS.getPtr(name[0..name_len]) orelse {
-        std.log.err("Schema name {s} does not exist in Schema hash map", .{name});
-        return -1;
+export fn zx12_free_buffer(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.C) c_int {
+    if (ctx == null) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    const context = ctx.?;
+
+    const buffer = context.buffers.get(buffer_id) orelse {
+        return @intFromEnum(ZX12_Error.BUFFER_NOT_FOUND);
     };
+
+    context.allocator.free(buffer);
+    _ = context.buffers.swapRemove(buffer_id);
+    return @intFromEnum(ZX12_Error.SUCCESS);
+}
+
+export fn zx12_free_schema(ctx: ?*ZX12_Context, schema_name: [*c]const u8, schema_name_len: usize) callconv(.C) c_int {
+    if (ctx == null or schema_name == null) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    const context = ctx.?;
+
+    if (schema_name_len == 0) {
+        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
+    }
+
+    const schema_key = schema_name[0..schema_name_len];
+    const schema = context.schemas.getPtr(schema_key) orelse {
+        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
+    };
+
+    // Free the schema
     schema.deinit();
-    //Free the name
-    const dup_name = SCHMEA_NAMES.getPtr(name[0..name_len]) orelse {
-        std.log.err("Schema name {s} does not exist in Schema names hash map", .{name});
-        return -1;
+
+    // Remove from maps
+    const name_ptr = context.schema_names.get(schema_key) orelse {
+        _ = context.schemas.swapRemove(schema_key);
+        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
     };
-    ALLOCATOR.free(dup_name.*);
-    _ = SCHMEA_NAMES.swapRemove(name[0..name_len]);
-    return 0;
+
+    context.allocator.free(name_ptr);
+    _ = context.schemas.swapRemove(schema_key);
+    _ = context.schema_names.swapRemove(schema_key);
+
+    return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn freeBuffer(ptr: [*c]const u8) callconv(.C) i8 {
-    const key = @intFromPtr(ptr);
-    const sz = BUFFERS.get(key) orelse {
-        std.log.err("Buffer not found for key {d}", .{key});
+export fn zx12_get_error_message(error_code: c_int) callconv(.C) [*:0]const u8 {
+    const err = @as(ZX12_Error, @enumFromInt(error_code));
+    return switch (err) {
+        .SUCCESS => "Success",
+        .INVALID_ARGUMENT => "Invalid argument",
+        .FILE_NOT_FOUND => "File not found",
+        .MEMORY_ERROR => "Memory allocation error",
+        .PARSE_ERROR => "Parse error",
+        .SCHEMA_NOT_FOUND => "Schema not found",
+        .BUFFER_NOT_FOUND => "Buffer not found",
+        .UNKNOWN_ERROR => "Unknown error",
+    };
+}
+
+export fn zx12_get_buffer_size(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.C) c_int {
+    if (ctx == null) {
+        return -1;
+    }
+
+    const context = ctx.?;
+    const buffer = context.buffers.get(buffer_id) orelse {
         return -1;
     };
-    ALLOCATOR.free(ptr[0..sz]);
-    _ = BUFFERS.swapRemove(key);
-    return 0;
+
+    return @intCast(buffer.len);
 }
