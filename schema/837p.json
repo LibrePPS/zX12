@@ -1111,6 +1111,69 @@
                                                     "target_field": "poa"
                                                 }
                                             ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BG"
+                                            ],
+                                            "target_collection": "condition_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BH"
+                                            ],
+                                            "target_collection": "occurrence_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 2,
+                                                    "target_field": "date_format"
+                                                },
+                                                {
+                                                    "component_position": 3,
+                                                    "target_field": "date"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BE"
+                                            ],
+                                            "target_collection": "value_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 4,
+                                                    "target_field": "amount"
+                                                }
+                                            ]
                                         }
                                     ]
                                 },

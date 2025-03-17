@@ -994,7 +994,26 @@ fn processLoopSegment(context: *ParseContext, segment_def: Segment, loop_range: 
         return;
     }
 
-    // Process found segments
+    // Special case for segments that use element patterns (like HI) that need to be merged
+    if (segment_def.process_all_elements) {
+        // For segments that define element patterns (like HI segments with different qualifiers),
+        // we want to process all instances and merge them into a single result object
+
+        // Process regular element mappings from the first segment
+        try processElementMappings(context.allocator, segments_found.items[0], &segment_def, loop_obj);
+
+        // Process element patterns from all segments - they'll merge into the same arrays
+        for (segments_found.items) |segment| {
+            try processElementPatterns(context.allocator, segment, &segment_def, loop_obj);
+        }
+
+        // Process related segments if any (from first segment only)
+        try processRelatedSegments(context, segments_found.items[0], &segment_def, loop_obj);
+
+        return;
+    }
+
+    // Process found segments with normal logic (for non-element pattern segments)
     if (segment_def.multiple) {
         // Create array for multiple segments
         var segments_array = std.json.Value{ .array = std.ArrayList(std.json.Value).init(context.allocator) };
