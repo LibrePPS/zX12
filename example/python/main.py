@@ -36,7 +36,7 @@ def parseFromSchema(schema_name:str, x12_data:str) -> str:
 
 if __name__ == '__main__':
     x12_data = open("../../samples/837p_example.x12","r").read()
-    schema_path = "/Absoulte/Path/to/schema/837p.json" #Change this to your schema path
+    schema_path = "/home/jjw07006/Deveolpment/zX12/schema/837p.json" #Change this to your schema path
     schema_name = "837p"
     # Load schema
     load = loadSchema(schema_path, schema_name)
@@ -47,5 +47,25 @@ if __name__ == '__main__':
     out = parseFromSchema(schema_name, x12_data)
     # pretty print the json
     print(json.dumps(json.loads(out), indent=4))
+    # Free schema
+    freeSchema(schema_name)
+
+    #837I
+    x12_data = open("../../samples/837i_example.x12","r").read()
+    schema_path = "/home/jjw07006/Deveolpment/zX12/schema/837i.json" #Change this to your schema path
+    schema_name = "837i"
+    # Load schema
+    load = loadSchema(schema_path, schema_name)
+    if load != 0:
+        print("Error loading schema")
+        exit(1)
+    # Parse
+    for i in range(1000000):
+        now = dt.datetime.now()
+        out = parseFromSchema(schema_name, x12_data)
+        elapsed = dt.datetime.now() - now
+        print(elapsed)
+    # pretty print the json
+    #print(json.dumps(json.loads(out), indent=4))
     # Free schema
     freeSchema(schema_name)
