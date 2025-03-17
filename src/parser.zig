@@ -159,7 +159,7 @@ pub const X12Document = struct {
 
         // Handle the last element
         if (element_start < segment_data.len) {
-            try self.parseElement(&segment, segment_data[element_start..]);
+            try self.parseElement(&segment, segment_data[element_start .. segment_data.len - 1]);
         }
 
         try self.segments.append(segment);
@@ -189,6 +189,54 @@ pub const X12Document = struct {
         }
 
         try segment.elements.append(element);
+    }
+
+    pub fn getSegmentsFollowing(self: *const X12Document, segmentId: []const u8, afterIndex: usize, maxDistance: usize, allocator: Allocator) !std.ArrayList(*const Segment) {
+        var result = std.ArrayList(*const Segment).init(allocator);
+        errdefer result.deinit();
+
+        var distance: usize = 0;
+        var i: usize = afterIndex + 1;
+
+        while (i < self.segments.items.len and distance < maxDistance) {
+            const segment = &self.segments.items[i];
+            if (std.mem.eql(u8, segment.id, segmentId)) {
+                try result.append(segment);
+            } else if (std.mem.eql(u8, segment.id, "HL") or
+                std.mem.eql(u8, segment.id, "CLM") or
+                std.mem.eql(u8, segment.id, "NM1"))
+            {
+                // Stop at logical boundaries like HL, CLM, or NM1
+                break;
+            }
+            i += 1;
+            distance += 1;
+        }
+
+        return result;
+    }
+
+    // Helper to get first segment following another segment within a certain distance
+    pub fn getSegmentFollowing(self: *const X12Document, segmentId: []const u8, afterIndex: usize, maxDistance: usize) ?*const Segment {
+        var distance: usize = 0;
+        var i: usize = afterIndex + 1;
+
+        while (i < self.segments.items.len and distance < maxDistance) {
+            const segment = &self.segments.items[i];
+            if (std.mem.eql(u8, segment.id, segmentId)) {
+                return segment;
+            } else if (std.mem.eql(u8, segment.id, "HL") or
+                std.mem.eql(u8, segment.id, "CLM") or
+                std.mem.eql(u8, segment.id, "NM1"))
+            {
+                // Stop at logical boundaries
+                break;
+            }
+            i += 1;
+            distance += 1;
+        }
+
+        return null;
     }
 
     fn validateStructure(self: *X12Document) !void {
