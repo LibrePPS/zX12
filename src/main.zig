@@ -3,8 +3,7 @@ const x12 = @import("parser.zig");
 const schema_parser = @import("schema_parser.zig");
 
 //@TODO - Clean this up and use a struct to hold everything, use a linked list to hold the schema and schema names
-var ARENA = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-const ALLOCATOR = ARENA.allocator();
+const ALLOCATOR = std.heap.c_allocator;
 var SCHMEAS = std.StringArrayHashMap(schema_parser.Schema).init(ALLOCATOR);
 var SCHMEA_NAMES = std.StringArrayHashMap([]const u8).init(ALLOCATOR);
 var BUFFERS = std.AutoArrayHashMap(usize, usize).init(ALLOCATOR);
