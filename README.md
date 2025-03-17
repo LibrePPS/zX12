@@ -511,16 +511,6 @@ The schema-based parser:
 - `fromJson(allocator, json_string)` - Create a schema from JSON definition
 - `parseWithSchema(allocator, document, schema)` - Parse an X12 document using a schema
 
-### Legacy Claim837 (Still Available)
-
-Specialized parser for 837 healthcare claims:
-
-- `init(allocator)` - Initialize a new 837 claim parser
-- `parse(document)` - Parse an X12 document as an 837 claim
-- `transaction_type` - Type of claim (professional, institutional, dental)
-- `billing_provider` - Information about the billing provider
-- `subscriber_loops` - List of subscriber information, patients, and claims
-
 ## Roadmap 🚧
 
 We're actively working on improving zX12. Upcoming features include:
