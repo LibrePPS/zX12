@@ -35,8 +35,8 @@ def parseFromSchema(schema_name:str, x12_data:str) -> str:
     return output_message_str.raw
 
 if __name__ == '__main__':
-    x12_data = open("../../samples/readme_sample.x12","r").read()
-    schema_path = "/Absoulte/path/to/schema/schema/837p.json" #Change this to your schema path
+    x12_data = open("../../samples/837p_example.x12","r").read()
+    schema_path = "/Absoulte/Path/to/schema/837p.json" #Change this to your schema path
     schema_name = "837p"
     # Load schema
     load = loadSchema(schema_path, schema_name)
