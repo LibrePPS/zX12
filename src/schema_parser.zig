@@ -904,12 +904,19 @@ pub const LoopRange = struct {
 };
 
 /// Find segments that match a loop's trigger conditions
-fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, allocator: Allocator) !std.ArrayList(usize) {
+fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, loop_range: ?*const LoopRange, allocator: Allocator) !std.ArrayList(usize) {
     var result = std.ArrayList(usize).init(allocator);
     errdefer result.deinit();
 
+    var loop_start: usize = 0;
+    var loop_end: usize = document.segments.items.len;
+    if (loop_range) |range| {
+        loop_start = range.start;
+        loop_end = range.end;
+    }
+
     // Look for segments with the matching ID
-    for (document.segments.items, 0..) |segment, i| {
+    for (document.segments.items[loop_start..loop_end], loop_start..loop_end) |segment, i| {
         if (std.mem.eql(u8, segment.id, trigger.segment_id)) {
             // If no value is specified in the trigger, just match on segment ID
             if (trigger.value == null) {
@@ -931,13 +938,12 @@ fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, a
 }
 
 /// Find the range (start and end indices) for a loop's segments
-fn findLoopRange(document: *const x12.X12Document, trigger_idx: usize) !LoopRange {
+fn findLoopRange(document: *const x12.X12Document, trigger_idx: usize, loop: *const Loop) !LoopRange {
     const start = trigger_idx;
     var end = document.segments.items.len;
     // Look for the next trigger segment (HL or similar) that would start a new loop
     for (document.segments.items[start + 1 ..], start + 1..) |segment, i| {
-        if (std.mem.eql(u8, segment.id, "HL") or
-            std.mem.eql(u8, segment.id, "ST") or
+        if (std.mem.eql(u8, segment.id, "ST") or
             std.mem.eql(u8, segment.id, "SE") or
             std.mem.eql(u8, segment.id, "GS") or
             std.mem.eql(u8, segment.id, "GE") or
@@ -946,6 +952,16 @@ fn findLoopRange(document: *const x12.X12Document, trigger_idx: usize) !LoopRang
         {
             end = i;
             break;
+        } else if (std.mem.eql(u8, segment.id, "HL")) {
+            //We found a new HL segment, but we need to check if this HL segment
+            // is a nested loop of this current loop if so it belongs in this range
+            for (loop.loops.items) |nested_loop| {
+                if (!std.mem.eql(u8, nested_loop.trigger.segment_id, segment.id)) {
+                    // This HL segment is not part of the current loop, so we can end the range
+                    end = i;
+                    break;
+                }
+            }
         }
     }
 
@@ -1103,8 +1119,8 @@ pub fn parseWithSchema(allocator: Allocator, document: *const x12.X12Document, s
     // First process header segments
     try processHeaderSegments(&context, schema);
 
-    // Then process loops
-    try processLoops(&context, schema.loops.items);
+    // Then process loops };
+    try processLoops(&context, schema.loops.items, null);
 
     return ParseResult{
         .value = result,
@@ -1193,10 +1209,10 @@ fn processElementMappings(allocator: Allocator, segment: *const x12.Segment, seg
     }
 }
 
-fn processLoops(context: *ParseContext, loops: []const Loop) ParserError!void {
+fn processLoops(context: *ParseContext, loops: []const Loop, loop_range: ?*const LoopRange) ParserError!void {
     for (loops) |loop| {
         // Find all instances of this loop's trigger
-        const triggers = findLoopTriggers(context.document, &loop.trigger, context.allocator) catch return ParserError.LoopError;
+        const triggers = findLoopTriggers(context.document, &loop.trigger, loop_range, context.allocator) catch return ParserError.LoopError;
         defer triggers.deinit();
 
         if (triggers.items.len == 0) continue; // No triggers found
@@ -1226,7 +1242,8 @@ fn processLoops(context: *ParseContext, loops: []const Loop) ParserError!void {
 
 fn processLoopInstance(context: *ParseContext, loop: *const Loop, trigger_idx: usize, loop_obj: *std.json.Value) !void {
     // Find the range of segments for this loop instance
-    const loop_range = try findLoopRange(context.document, trigger_idx);
+    const loop_range = try findLoopRange(context.document, trigger_idx, loop);
+
     // Process each segment in the loop definition
     for (loop.segments.items) |segment_def| {
         try processLoopSegment(context, segment_def, loop_range, loop_obj);
@@ -1236,7 +1253,7 @@ fn processLoopInstance(context: *ParseContext, loop: *const Loop, trigger_idx: u
     if (loop.loops.items.len > 0) {
         var nested_context = context.*;
         nested_context.result = loop_obj;
-        try processLoops(&nested_context, loop.loops.items);
+        try processLoops(&nested_context, loop.loops.items, &loop_range);
     }
 }
 
