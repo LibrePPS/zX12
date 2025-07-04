@@ -91,18 +91,16 @@ class ZX12:
         # Return parsed JSON
         return output_buffer.raw[:buffer_len.value].decode('utf-8')
 
-#837I
-x12_data = open("../../samples/837i_example.x12","r").read()
-schema_path = "/absoulte/path/to/schema/837i.json" #Change this to your schema path
-schema_name = "837i"
+#837P
+x12_data = open("../../samples/837p_example.x12","r").read()
+schema_path = "/home/jjw07006/Deveolpment/zX12/schema/837p.json" #Change this to your schema path
+schema_name = "837p"
 
-zx12 = ZX12()
-zx12.load_schema(schema_path, schema_name)
-for i in range(100000):
-    now = datetime.datetime.now()
+with open("./837p.json", "w+") as f:
+    zx12 = ZX12()
+    zx12.load_schema(schema_path, schema_name)
     parsed_data = zx12.parse_x12(schema_name, x12_data)
-    elapsed = datetime.datetime.now() - now
-    print(elapsed)
+    f.write(json.dumps(json.loads(parsed_data), indent=2))
 
 
 

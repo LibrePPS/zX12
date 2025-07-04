@@ -1172,172 +1172,706 @@
                                     ]
                                 }
                             ],
+                            "loops": []
+                        },
+                        {
+                            "id": "2300",
+                            "name": "Claim Information",
+                            "multiple": true,
+                            "trigger": {
+                                "segment_id": "CLM",
+                                "element_position": 0
+                            },
+                            "segments": [
+                                {
+                                    "id": "CLM",
+                                    "required": true,
+                                    "elements": [
+                                        {
+                                            "position": 0,
+                                            "path": "claim.claim_id"
+                                        },
+                                        {
+                                            "position": 1,
+                                            "path": "claim.total_charges"
+                                        },
+                                        {
+                                            "position": 2,
+                                            "path": "claim.amount_paid"
+                                        },
+                                        {
+                                            "position": 3,
+                                            "path": "claim.patient_control_number"
+                                        },
+                                        {
+                                            "position": 4,
+                                            "path": "claim.type_of_bill",
+                                            "composite": {
+                                                "separator": ":",
+                                                "index": 1
+                                            }
+                                        },
+                                        {
+                                            "position": 5,
+                                            "path": "claim.frequency_code",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "1",
+                                                    "mapped_value": "admit_through_discharge"
+                                                },
+                                                {
+                                                    "value": "2",
+                                                    "mapped_value": "interim_first_claim"
+                                                },
+                                                {
+                                                    "value": "3",
+                                                    "mapped_value": "interim_continuing_claim"
+                                                },
+                                                {
+                                                    "value": "4",
+                                                    "mapped_value": "interim_last_claim"
+                                                },
+                                                {
+                                                    "value": "7",
+                                                    "mapped_value": "replacement"
+                                                },
+                                                {
+                                                    "value": "8",
+                                                    "mapped_value": "void"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 6,
+                                            "path": "claim.signature_indicator"
+                                        },
+                                        {
+                                            "position": 7,
+                                            "path": "claim.assignment_indicator"
+                                        },
+                                        {
+                                            "position": 8,
+                                            "path": "claim.benefits_assignment"
+                                        },
+                                        {
+                                            "position": 9,
+                                            "path": "claim.release_info"
+                                        },
+                                        {
+                                            "position": 10,
+                                            "path": "claim.delay_reason",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "1",
+                                                    "mapped_value": "proof_of_eligibility_unavailable"
+                                                },
+                                                {
+                                                    "value": "2",
+                                                    "mapped_value": "litigation"
+                                                },
+                                                {
+                                                    "value": "3",
+                                                    "mapped_value": "authorization_delays"
+                                                },
+                                                {
+                                                    "value": "4",
+                                                    "mapped_value": "delay_in_certifying_provider"
+                                                },
+                                                {
+                                                    "value": "5",
+                                                    "mapped_value": "delay_in_supplying_billing_forms"
+                                                },
+                                                {
+                                                    "value": "6",
+                                                    "mapped_value": "delay_in_delivery_of_custom_supplies"
+                                                },
+                                                {
+                                                    "value": "7",
+                                                    "mapped_value": "third_party_processing_delay"
+                                                },
+                                                {
+                                                    "value": "8",
+                                                    "mapped_value": "delay_in_eligibility_determination"
+                                                },
+                                                {
+                                                    "value": "9",
+                                                    "mapped_value": "original_claim_rejected"
+                                                },
+                                                {
+                                                    "value": "10",
+                                                    "mapped_value": "administration_delay"
+                                                },
+                                                {
+                                                    "value": "11",
+                                                    "mapped_value": "other"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "DTP",
+                                    "required": false,
+                                    "multiple": true,
+                                    "elements": [
+                                        {
+                                            "position": 0,
+                                            "path": "claim.date_qualifier",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "434",
+                                                    "mapped_value": "statement_dates"
+                                                },
+                                                {
+                                                    "value": "435",
+                                                    "mapped_value": "admission_date"
+                                                },
+                                                {
+                                                    "value": "096",
+                                                    "mapped_value": "discharge_date"
+                                                },
+                                                {
+                                                    "value": "431",
+                                                    "mapped_value": "onset_date"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 1,
+                                            "path": "claim.date_format_qualifier",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "D8",
+                                                    "mapped_value": "CCYYMMDD"
+                                                },
+                                                {
+                                                    "value": "RD8",
+                                                    "mapped_value": "range_CCYYMMDD_CCYYMMDD"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 2,
+                                            "path": "claim.service_date"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "CL1",
+                                    "required": false,
+                                    "elements": [
+                                        {
+                                            "position": 0,
+                                            "path": "claim.admission_type",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "1",
+                                                    "mapped_value": "emergency"
+                                                },
+                                                {
+                                                    "value": "2",
+                                                    "mapped_value": "urgent"
+                                                },
+                                                {
+                                                    "value": "3",
+                                                    "mapped_value": "elective"
+                                                },
+                                                {
+                                                    "value": "4",
+                                                    "mapped_value": "newborn"
+                                                },
+                                                {
+                                                    "value": "5",
+                                                    "mapped_value": "trauma"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 1,
+                                            "path": "claim.admission_source",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "1",
+                                                    "mapped_value": "physician_referral"
+                                                },
+                                                {
+                                                    "value": "2",
+                                                    "mapped_value": "clinic_referral"
+                                                },
+                                                {
+                                                    "value": "3",
+                                                    "mapped_value": "hmo_referral"
+                                                },
+                                                {
+                                                    "value": "4",
+                                                    "mapped_value": "transfer_from_hospital"
+                                                },
+                                                {
+                                                    "value": "5",
+                                                    "mapped_value": "transfer_from_snf"
+                                                },
+                                                {
+                                                    "value": "6",
+                                                    "mapped_value": "transfer_from_another_facility"
+                                                },
+                                                {
+                                                    "value": "7",
+                                                    "mapped_value": "emergency_room"
+                                                },
+                                                {
+                                                    "value": "8",
+                                                    "mapped_value": "court_law"
+                                                },
+                                                {
+                                                    "value": "9",
+                                                    "mapped_value": "information_not_available"
+                                                },
+                                                {
+                                                    "value": "A",
+                                                    "mapped_value": "transfer_from_critical_access_hospital"
+                                                },
+                                                {
+                                                    "value": "B",
+                                                    "mapped_value": "transfer_from_another_home_health_agency"
+                                                },
+                                                {
+                                                    "value": "C",
+                                                    "mapped_value": "readmission_to_same_home_health_agency"
+                                                },
+                                                {
+                                                    "value": "D",
+                                                    "mapped_value": "transfer_from_hospital_inpatient"
+                                                },
+                                                {
+                                                    "value": "E",
+                                                    "mapped_value": "transfer_from_ambulatory_surgery_center"
+                                                },
+                                                {
+                                                    "value": "F",
+                                                    "mapped_value": "transfer_from_hospice"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 2,
+                                            "path": "claim.patient_status",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "01",
+                                                    "mapped_value": "discharge_to_home"
+                                                },
+                                                {
+                                                    "value": "02",
+                                                    "mapped_value": "discharge_to_short_term_hospital"
+                                                },
+                                                {
+                                                    "value": "03",
+                                                    "mapped_value": "discharge_to_snf"
+                                                },
+                                                {
+                                                    "value": "04",
+                                                    "mapped_value": "discharge_to_intermediate_care"
+                                                },
+                                                {
+                                                    "value": "05",
+                                                    "mapped_value": "discharge_to_other_facility"
+                                                },
+                                                {
+                                                    "value": "06",
+                                                    "mapped_value": "discharge_to_home_health"
+                                                },
+                                                {
+                                                    "value": "07",
+                                                    "mapped_value": "left_against_medical_advice"
+                                                },
+                                                {
+                                                    "value": "08",
+                                                    "mapped_value": "home_iv_therapy"
+                                                },
+                                                {
+                                                    "value": "09",
+                                                    "mapped_value": "admitted_as_inpatient"
+                                                },
+                                                {
+                                                    "value": "20",
+                                                    "mapped_value": "expired"
+                                                },
+                                                {
+                                                    "value": "30",
+                                                    "mapped_value": "still_patient"
+                                                },
+                                                {
+                                                    "value": "40",
+                                                    "mapped_value": "expired_at_home"
+                                                },
+                                                {
+                                                    "value": "41",
+                                                    "mapped_value": "expired_in_medical_facility"
+                                                },
+                                                {
+                                                    "value": "42",
+                                                    "mapped_value": "expired_place_unknown"
+                                                },
+                                                {
+                                                    "value": "43",
+                                                    "mapped_value": "discharge_to_federal_hospital"
+                                                },
+                                                {
+                                                    "value": "50",
+                                                    "mapped_value": "hospice_home"
+                                                },
+                                                {
+                                                    "value": "51",
+                                                    "mapped_value": "hospice_medical_facility"
+                                                },
+                                                {
+                                                    "value": "61",
+                                                    "mapped_value": "discharge_to_swing_bed"
+                                                },
+                                                {
+                                                    "value": "62",
+                                                    "mapped_value": "discharge_to_rehab"
+                                                },
+                                                {
+                                                    "value": "63",
+                                                    "mapped_value": "discharge_to_long_term_care_hospital"
+                                                },
+                                                {
+                                                    "value": "64",
+                                                    "mapped_value": "discharge_to_nursing_facility"
+                                                },
+                                                {
+                                                    "value": "65",
+                                                    "mapped_value": "discharged_to_psychiatric_hospital"
+                                                },
+                                                {
+                                                    "value": "66",
+                                                    "mapped_value": "discharged_to_critical_access_hospital"
+                                                },
+                                                {
+                                                    "value": "69",
+                                                    "mapped_value": "discharged_to_designated_center"
+                                                },
+                                                {
+                                                    "value": "70",
+                                                    "mapped_value": "discharged_to_another_type_of_facility"
+                                                },
+                                                {
+                                                    "value": "81",
+                                                    "mapped_value": "discharged_to_home_with_planned_readmission"
+                                                },
+                                                {
+                                                    "value": "82",
+                                                    "mapped_value": "discharged_to_short_term_hospital_with_planned_readmission"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "HI",
+                                    "required": false,
+                                    "process_all_elements": true,
+                                    "element_patterns": [
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "ABK",
+                                                "ABF",
+                                                "ABJ",
+                                                "ABN",
+                                                "APR"
+                                            ],
+                                            "target_collection": "diagnosis_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 8,
+                                                    "target_field": "poa"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BBR",
+                                                "BBQ"
+                                            ],
+                                            "target_collection": "procedure_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 2,
+                                                    "target_field": "date_format"
+                                                },
+                                                {
+                                                    "component_position": 3,
+                                                    "target_field": "date"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "DR"
+                                            ],
+                                            "target_collection": "drg_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BG"
+                                            ],
+                                            "target_collection": "condition_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BH"
+                                            ],
+                                            "target_collection": "occurrence_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 2,
+                                                    "target_field": "date_format"
+                                                },
+                                                {
+                                                    "component_position": 3,
+                                                    "target_field": "date"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BI"
+                                            ],
+                                            "target_collection": "occurrence_span_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 2,
+                                                    "target_field": "date_format"
+                                                },
+                                                {
+                                                    "component_position": 3,
+                                                    "target_field": "date"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "qualifier_position": 0,
+                                            "qualifier_values": [
+                                                "BE"
+                                            ],
+                                            "target_collection": "value_codes",
+                                            "component_mappings": [
+                                                {
+                                                    "component_position": 0,
+                                                    "target_field": "qualifier"
+                                                },
+                                                {
+                                                    "component_position": 1,
+                                                    "target_field": "code"
+                                                },
+                                                {
+                                                    "component_position": 4,
+                                                    "target_field": "amount"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "id": "REF",
+                                    "required": false,
+                                    "multiple": true,
+                                    "elements": [
+                                        {
+                                            "position": 0,
+                                            "path": "claim.reference_qualifier",
+                                            "value_mappings": [
+                                                {
+                                                    "value": "EA",
+                                                    "mapped_value": "medical_record_id"
+                                                },
+                                                {
+                                                    "value": "D9",
+                                                    "mapped_value": "claim_number"
+                                                },
+                                                {
+                                                    "value": "1J",
+                                                    "mapped_value": "payer_claim_control_number"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "position": 1,
+                                            "path": "claim.reference_id"
+                                        }
+                                    ]
+                                }
+                            ],
                             "loops": [
                                 {
-                                    "id": "2300",
-                                    "name": "Claim Information",
+                                    "id": "2400",
+                                    "name": "Service Line",
                                     "multiple": true,
                                     "trigger": {
-                                        "segment_id": "CLM",
+                                        "segment_id": "LX",
                                         "element_position": 0
                                     },
                                     "segments": [
                                         {
-                                            "id": "CLM",
+                                            "id": "LX",
                                             "required": true,
                                             "elements": [
                                                 {
                                                     "position": 0,
-                                                    "path": "claim.claim_id"
+                                                    "path": "service_line.line_number"
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "id": "SV2",
+                                            "required": true,
+                                            "elements": [
+                                                {
+                                                    "position": 0,
+                                                    "path": "service_line.revenue_code"
                                                 },
                                                 {
                                                     "position": 1,
-                                                    "path": "claim.total_charges"
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "claim.amount_paid"
-                                                },
-                                                {
-                                                    "position": 3,
-                                                    "path": "claim.patient_control_number"
-                                                },
-                                                {
-                                                    "position": 4,
-                                                    "path": "claim.type_of_bill",
+                                                    "path": "service_line.procedure_code",
                                                     "composite": {
                                                         "separator": ":",
                                                         "index": 1
                                                     }
                                                 },
                                                 {
-                                                    "position": 5,
-                                                    "path": "claim.frequency_code",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "1",
-                                                            "mapped_value": "admit_through_discharge"
-                                                        },
-                                                        {
-                                                            "value": "2",
-                                                            "mapped_value": "interim_first_claim"
-                                                        },
-                                                        {
-                                                            "value": "3",
-                                                            "mapped_value": "interim_continuing_claim"
-                                                        },
-                                                        {
-                                                            "value": "4",
-                                                            "mapped_value": "interim_last_claim"
-                                                        },
-                                                        {
-                                                            "value": "7",
-                                                            "mapped_value": "replacement"
-                                                        },
-                                                        {
-                                                            "value": "8",
-                                                            "mapped_value": "void"
-                                                        }
-                                                    ]
+                                                    "position": 1,
+                                                    "path": "service_line.modifier_1",
+                                                    "composite": {
+                                                        "separator": ":",
+                                                        "index": 2
+                                                    }
+                                                },
+                                                {
+                                                    "position": 1,
+                                                    "path": "service_line.modifier_2",
+                                                    "composite": {
+                                                        "separator": ":",
+                                                        "index": 3
+                                                    }
+                                                },
+                                                {
+                                                    "position": 1,
+                                                    "path": "service_line.modifier_3",
+                                                    "composite": {
+                                                        "separator": ":",
+                                                        "index": 4
+                                                    }
+                                                },
+                                                {
+                                                    "position": 1,
+                                                    "path": "service_line.modifier_4",
+                                                    "composite": {
+                                                        "separator": ":",
+                                                        "index": 5
+                                                    }
+                                                },
+                                                {
+                                                    "position": 1,
+                                                    "path": "service_line.short_description",
+                                                    "composite": {
+                                                        "separator": ":",
+                                                        "index": 6
+                                                    }
+                                                },
+                                                {
+                                                    "position": 2,
+                                                    "path": "service_line.amount"
+                                                },
+                                                {
+                                                    "position": 3,
+                                                    "path": "service_line.unit_code"
+                                                },
+                                                {
+                                                    "position": 4,
+                                                    "path": "service_line.quantity"
                                                 },
                                                 {
                                                     "position": 6,
-                                                    "path": "claim.signature_indicator"
-                                                },
-                                                {
-                                                    "position": 7,
-                                                    "path": "claim.assignment_indicator"
-                                                },
-                                                {
-                                                    "position": 8,
-                                                    "path": "claim.benefits_assignment"
-                                                },
-                                                {
-                                                    "position": 9,
-                                                    "path": "claim.release_info"
-                                                },
-                                                {
-                                                    "position": 10,
-                                                    "path": "claim.delay_reason",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "1",
-                                                            "mapped_value": "proof_of_eligibility_unavailable"
-                                                        },
-                                                        {
-                                                            "value": "2",
-                                                            "mapped_value": "litigation"
-                                                        },
-                                                        {
-                                                            "value": "3",
-                                                            "mapped_value": "authorization_delays"
-                                                        },
-                                                        {
-                                                            "value": "4",
-                                                            "mapped_value": "delay_in_certifying_provider"
-                                                        },
-                                                        {
-                                                            "value": "5",
-                                                            "mapped_value": "delay_in_supplying_billing_forms"
-                                                        },
-                                                        {
-                                                            "value": "6",
-                                                            "mapped_value": "delay_in_delivery_of_custom_supplies"
-                                                        },
-                                                        {
-                                                            "value": "7",
-                                                            "mapped_value": "third_party_processing_delay"
-                                                        },
-                                                        {
-                                                            "value": "8",
-                                                            "mapped_value": "delay_in_eligibility_determination"
-                                                        },
-                                                        {
-                                                            "value": "9",
-                                                            "mapped_value": "original_claim_rejected"
-                                                        },
-                                                        {
-                                                            "value": "10",
-                                                            "mapped_value": "administration_delay"
-                                                        },
-                                                        {
-                                                            "value": "11",
-                                                            "mapped_value": "other"
-                                                        }
-                                                    ]
+                                                    "path": "service_line.non_covered_charge"
                                                 }
                                             ]
                                         },
                                         {
                                             "id": "DTP",
                                             "required": false,
-                                            "multiple": true,
                                             "elements": [
                                                 {
                                                     "position": 0,
-                                                    "path": "claim.date_qualifier",
+                                                    "path": "service_line.date_qualifier",
                                                     "value_mappings": [
                                                         {
-                                                            "value": "434",
-                                                            "mapped_value": "statement_dates"
-                                                        },
-                                                        {
-                                                            "value": "435",
-                                                            "mapped_value": "admission_date"
-                                                        },
-                                                        {
-                                                            "value": "096",
-                                                            "mapped_value": "discharge_date"
-                                                        },
-                                                        {
-                                                            "value": "431",
-                                                            "mapped_value": "onset_date"
+                                                            "value": "472",
+                                                            "mapped_value": "service_date"
                                                         }
                                                     ]
                                                 },
                                                 {
                                                     "position": 1,
-                                                    "path": "claim.date_format_qualifier",
+                                                    "path": "service_line.date_format_qualifier",
                                                     "value_mappings": [
                                                         {
                                                             "value": "D8",
@@ -1351,498 +1885,7 @@
                                                 },
                                                 {
                                                     "position": 2,
-                                                    "path": "claim.service_date"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "CL1",
-                                            "required": false,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "claim.admission_type",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "1",
-                                                            "mapped_value": "emergency"
-                                                        },
-                                                        {
-                                                            "value": "2",
-                                                            "mapped_value": "urgent"
-                                                        },
-                                                        {
-                                                            "value": "3",
-                                                            "mapped_value": "elective"
-                                                        },
-                                                        {
-                                                            "value": "4",
-                                                            "mapped_value": "newborn"
-                                                        },
-                                                        {
-                                                            "value": "5",
-                                                            "mapped_value": "trauma"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "claim.admission_source",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "1",
-                                                            "mapped_value": "physician_referral"
-                                                        },
-                                                        {
-                                                            "value": "2",
-                                                            "mapped_value": "clinic_referral"
-                                                        },
-                                                        {
-                                                            "value": "3",
-                                                            "mapped_value": "hmo_referral"
-                                                        },
-                                                        {
-                                                            "value": "4",
-                                                            "mapped_value": "transfer_from_hospital"
-                                                        },
-                                                        {
-                                                            "value": "5",
-                                                            "mapped_value": "transfer_from_snf"
-                                                        },
-                                                        {
-                                                            "value": "6",
-                                                            "mapped_value": "transfer_from_another_facility"
-                                                        },
-                                                        {
-                                                            "value": "7",
-                                                            "mapped_value": "emergency_room"
-                                                        },
-                                                        {
-                                                            "value": "8",
-                                                            "mapped_value": "court_law"
-                                                        },
-                                                        {
-                                                            "value": "9",
-                                                            "mapped_value": "information_not_available"
-                                                        },
-                                                        {
-                                                            "value": "A",
-                                                            "mapped_value": "transfer_from_critical_access_hospital"
-                                                        },
-                                                        {
-                                                            "value": "B",
-                                                            "mapped_value": "transfer_from_another_home_health_agency"
-                                                        },
-                                                        {
-                                                            "value": "C",
-                                                            "mapped_value": "readmission_to_same_home_health_agency"
-                                                        },
-                                                        {
-                                                            "value": "D",
-                                                            "mapped_value": "transfer_from_hospital_inpatient"
-                                                        },
-                                                        {
-                                                            "value": "E",
-                                                            "mapped_value": "transfer_from_ambulatory_surgery_center"
-                                                        },
-                                                        {
-                                                            "value": "F",
-                                                            "mapped_value": "transfer_from_hospice"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "claim.patient_status",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "01",
-                                                            "mapped_value": "discharge_to_home"
-                                                        },
-                                                        {
-                                                            "value": "02",
-                                                            "mapped_value": "discharge_to_short_term_hospital"
-                                                        },
-                                                        {
-                                                            "value": "03",
-                                                            "mapped_value": "discharge_to_snf"
-                                                        },
-                                                        {
-                                                            "value": "04",
-                                                            "mapped_value": "discharge_to_intermediate_care"
-                                                        },
-                                                        {
-                                                            "value": "05",
-                                                            "mapped_value": "discharge_to_other_facility"
-                                                        },
-                                                        {
-                                                            "value": "06",
-                                                            "mapped_value": "discharge_to_home_health"
-                                                        },
-                                                        {
-                                                            "value": "07",
-                                                            "mapped_value": "left_against_medical_advice"
-                                                        },
-                                                        {
-                                                            "value": "08",
-                                                            "mapped_value": "home_iv_therapy"
-                                                        },
-                                                        {
-                                                            "value": "09",
-                                                            "mapped_value": "admitted_as_inpatient"
-                                                        },
-                                                        {
-                                                            "value": "20",
-                                                            "mapped_value": "expired"
-                                                        },
-                                                        {
-                                                            "value": "30",
-                                                            "mapped_value": "still_patient"
-                                                        },
-                                                        {
-                                                            "value": "40",
-                                                            "mapped_value": "expired_at_home"
-                                                        },
-                                                        {
-                                                            "value": "41",
-                                                            "mapped_value": "expired_in_medical_facility"
-                                                        },
-                                                        {
-                                                            "value": "42",
-                                                            "mapped_value": "expired_place_unknown"
-                                                        },
-                                                        {
-                                                            "value": "43",
-                                                            "mapped_value": "discharge_to_federal_hospital"
-                                                        },
-                                                        {
-                                                            "value": "50",
-                                                            "mapped_value": "hospice_home"
-                                                        },
-                                                        {
-                                                            "value": "51",
-                                                            "mapped_value": "hospice_medical_facility"
-                                                        },
-                                                        {
-                                                            "value": "61",
-                                                            "mapped_value": "discharge_to_swing_bed"
-                                                        },
-                                                        {
-                                                            "value": "62",
-                                                            "mapped_value": "discharge_to_rehab"
-                                                        },
-                                                        {
-                                                            "value": "63",
-                                                            "mapped_value": "discharge_to_long_term_care_hospital"
-                                                        },
-                                                        {
-                                                            "value": "64",
-                                                            "mapped_value": "discharge_to_nursing_facility"
-                                                        },
-                                                        {
-                                                            "value": "65",
-                                                            "mapped_value": "discharged_to_psychiatric_hospital"
-                                                        },
-                                                        {
-                                                            "value": "66",
-                                                            "mapped_value": "discharged_to_critical_access_hospital"
-                                                        },
-                                                        {
-                                                            "value": "69",
-                                                            "mapped_value": "discharged_to_designated_center"
-                                                        },
-                                                        {
-                                                            "value": "70",
-                                                            "mapped_value": "discharged_to_another_type_of_facility"
-                                                        },
-                                                        {
-                                                            "value": "81",
-                                                            "mapped_value": "discharged_to_home_with_planned_readmission"
-                                                        },
-                                                        {
-                                                            "value": "82",
-                                                            "mapped_value": "discharged_to_short_term_hospital_with_planned_readmission"
-                                                        }
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "HI",
-                                            "required": false,
-                                            "process_all_elements": true,
-                                            "element_patterns": [
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "ABK",
-                                                        "ABF",
-                                                        "ABJ",
-                                                        "ABN",
-                                                        "APR"
-                                                    ],
-                                                    "target_collection": "diagnosis_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        },
-                                                        {
-                                                            "component_position": 8,
-                                                            "target_field": "poa"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "BBR",
-                                                        "BBQ"
-                                                    ],
-                                                    "target_collection": "procedure_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        },
-                                                        {
-                                                            "component_position": 2,
-                                                            "target_field": "date_format"
-                                                        },
-                                                        {
-                                                            "component_position": 3,
-                                                            "target_field": "date"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "DR"
-                                                    ],
-                                                    "target_collection": "drg_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "BG"
-                                                    ],
-                                                    "target_collection": "condition_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "BH"
-                                                    ],
-                                                    "target_collection": "occurrence_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        },
-                                                        {
-                                                            "component_position": 2,
-                                                            "target_field": "date_format"
-                                                        },
-                                                        {
-                                                            "component_position": 3,
-                                                            "target_field": "date"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "BI"
-                                                    ],
-                                                    "target_collection": "occurrence_span_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        },
-                                                        {
-                                                            "component_position": 2,
-                                                            "target_field": "date_format"
-                                                        },
-                                                        {
-                                                            "component_position": 3,
-                                                            "target_field": "date"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "qualifier_position": 0,
-                                                    "qualifier_values": [
-                                                        "BE"
-                                                    ],
-                                                    "target_collection": "value_codes",
-                                                    "component_mappings": [
-                                                        {
-                                                            "component_position": 0,
-                                                            "target_field": "qualifier"
-                                                        },
-                                                        {
-                                                            "component_position": 1,
-                                                            "target_field": "code"
-                                                        },
-                                                        {
-                                                            "component_position": 4,
-                                                            "target_field": "amount"
-                                                        }
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "REF",
-                                            "required": false,
-                                            "multiple": true,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "claim.reference_qualifier",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "EA",
-                                                            "mapped_value": "medical_record_id"
-                                                        },
-                                                        {
-                                                            "value": "D9",
-                                                            "mapped_value": "claim_number"
-                                                        },
-                                                        {
-                                                            "value": "1J",
-                                                            "mapped_value": "payer_claim_control_number"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "claim.reference_id"
-                                                }
-                                            ]
-                                        }
-                                    ],
-                                    "loops": [
-                                        {
-                                            "id": "2400",
-                                            "name": "Service Line",
-                                            "multiple": true,
-                                            "trigger": {
-                                                "segment_id": "LX",
-                                                "element_position": 0
-                                            },
-                                            "segments": [
-                                                {
-                                                    "id": "LX",
-                                                    "required": true,
-                                                    "elements": [
-                                                        {
-                                                            "position": 0,
-                                                            "path": "service_line.line_number"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "id": "SV2",
-                                                    "required": true,
-                                                    "elements": [
-                                                        {
-                                                            "position": 0,
-                                                            "path": "service_line.revenue_code"
-                                                        },
-                                                        {
-                                                            "position": 1,
-                                                            "path": "service_line.procedure_code"
-                                                        },
-                                                        {
-                                                            "position": 2,
-                                                            "path": "service_line.amount"
-                                                        },
-                                                        {
-                                                            "position": 3,
-                                                            "path": "service_line.unit_code"
-                                                        },
-                                                        {
-                                                            "position": 4,
-                                                            "path": "service_line.quantity"
-                                                        },
-                                                        {
-                                                            "position": 6,
-                                                            "path": "service_line.description"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "id": "DTP",
-                                                    "required": false,
-                                                    "elements": [
-                                                        {
-                                                            "position": 0,
-                                                            "path": "service_line.date_qualifier",
-                                                            "value_mappings": [
-                                                                {
-                                                                    "value": "472",
-                                                                    "mapped_value": "service_date"
-                                                                }
-                                                            ]
-                                                        },
-                                                        {
-                                                            "position": 1,
-                                                            "path": "service_line.date_format_qualifier",
-                                                            "value_mappings": [
-                                                                {
-                                                                    "value": "D8",
-                                                                    "mapped_value": "CCYYMMDD"
-                                                                },
-                                                                {
-                                                                    "value": "RD8",
-                                                                    "mapped_value": "range_CCYYMMDD_CCYYMMDD"
-                                                                }
-                                                            ]
-                                                        },
-                                                        {
-                                                            "position": 2,
-                                                            "path": "service_line.service_date"
-                                                        }
-                                                    ]
+                                                    "path": "service_line.service_date"
                                                 }
                                             ]
                                         }
