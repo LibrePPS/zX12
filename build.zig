@@ -43,6 +43,13 @@ pub fn build(b: *std.Build) void {
     // running `zig build`).
     b.installArtifact(lib);
 
+    // Export the module for native zig implementations
+    const zx12_module = b.addModule("zx12", .{
+        .root_source_file = b.path("src/main.zig"),
+        .link_libc = true,
+    });
+    _ = zx12_module;
+
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
