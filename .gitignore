@@ -1,2 +1,8 @@
 .zig-cache/
 .zig-out/
+zig-out/
+example/zig/zig-out/
+example/zig/zig-cache/
+example/zig/build.zig.zon
+example/zig/*.json
+example/zig/*.x12
