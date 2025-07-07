@@ -2,6 +2,10 @@ const std = @import("std");
 const x12 = @import("parser.zig");
 const schema_parser = @import("schema_parser.zig");
 
+// Export modules for native zig use
+pub const parser = x12;
+pub const schema_parser_mod = schema_parser;
+
 // Handle-based design with proper error handling
 pub const ZX12_Error = enum(c_int) {
     SUCCESS = 0,
