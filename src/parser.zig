@@ -17,16 +17,18 @@ pub const X12Error = error{
 pub const Element = struct {
     value: []const u8,
     components: std.ArrayList([]const u8),
+    allocator: Allocator,
 
     pub fn init(allocator: Allocator) Element {
         return Element{
             .value = "",
-            .components = std.ArrayList([]const u8).init(allocator),
+            .components = std.ArrayList([]const u8){},
+            .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Element) void {
-        self.components.deinit();
+        self.components.deinit(self.allocator);
     }
 
     pub fn jsonStringify(self: anytype, out: anytype) !void {
@@ -37,11 +39,13 @@ pub const Element = struct {
 pub const Segment = struct {
     id: []const u8,
     elements: std.ArrayList(Element),
+    allocator: Allocator,
 
     pub fn init(allocator: Allocator) Segment {
         return Segment{
             .id = "",
-            .elements = std.ArrayList(Element).init(allocator),
+            .elements = std.ArrayList(Element){},
+            .allocator = allocator,
         };
     }
 
@@ -49,7 +53,7 @@ pub const Segment = struct {
         for (0..self.elements.items.len) |i| {
             self.elements.items[i].deinit();
         }
-        self.elements.deinit();
+        self.elements.deinit(self.allocator);
     }
 
     pub fn getElement(self: *const Segment, index: usize) ?*const Element {
@@ -72,7 +76,7 @@ pub const X12Document = struct {
 
     pub fn init(allocator: Allocator) X12Document {
         return X12Document{
-            .segments = std.ArrayList(Segment).init(allocator),
+            .segments = std.ArrayList(Segment){},
             .allocator = allocator,
         };
     }
@@ -82,7 +86,7 @@ pub const X12Document = struct {
             self.allocator.free(self.segments.items[i].id);
             self.segments.items[i].deinit();
         }
-        self.segments.deinit();
+        self.segments.deinit(self.allocator);
     }
 
     pub fn parse(self: *X12Document, data: []const u8) !void {
@@ -130,13 +134,13 @@ pub const X12Document = struct {
         // First get the segment ID (first element)
         while (i < segment_data.len) {
             if (segment_data[i] == self.element_delimiter) {
-                var id = std.ArrayList(u8).init(self.allocator);
-                errdefer id.deinit();
-                defer id.deinit();
+                var id: std.ArrayList(u8) = std.ArrayList(u8){};
+                errdefer id.deinit(self.allocator);
+                defer id.deinit(self.allocator);
                 // Remove any newlines from the segment ID
                 for (segment_data[0..i]) |c| {
                     if (c != '\n') {
-                        try id.append(c);
+                        try id.append(self.allocator, c);
                     }
                 }
                 segment.id = try self.allocator.dupe(u8, id.items);
@@ -162,7 +166,7 @@ pub const X12Document = struct {
             try self.parseElement(&segment, segment_data[element_start .. segment_data.len - 1]);
         }
 
-        try self.segments.append(segment);
+        try self.segments.append(self.allocator, segment);
     }
 
     fn parseElement(self: *X12Document, segment: *Segment, element_data: []const u8) !void {
@@ -177,7 +181,7 @@ pub const X12Document = struct {
 
         while (i < element_data.len) {
             if (element_data[i] == self.component_delimiter) {
-                try element.components.append(element_data[component_start..i]);
+                try element.components.append(self.allocator, element_data[component_start..i]);
                 component_start = i + 1;
             }
             i += 1;
@@ -185,14 +189,14 @@ pub const X12Document = struct {
 
         // Handle the last component if component delimiter was found
         if (element.components.items.len > 0 and component_start < element_data.len) {
-            try element.components.append(element_data[component_start..]);
+            try element.components.append(self.allocator, element_data[component_start..]);
         }
 
-        try segment.elements.append(element);
+        try segment.elements.append(self.allocator, element);
     }
 
     pub fn getSegmentsFollowing(self: *const X12Document, segmentId: []const u8, afterIndex: usize, maxDistance: usize, allocator: Allocator) !std.ArrayList(*const Segment) {
-        var result = std.ArrayList(*const Segment).init(allocator);
+        var result: std.ArrayList(*const Segment) = {};
         errdefer result.deinit();
 
         var distance: usize = 0;
@@ -201,7 +205,7 @@ pub const X12Document = struct {
         while (i < self.segments.items.len and distance < maxDistance) {
             const segment = &self.segments.items[i];
             if (std.mem.eql(u8, segment.id, segmentId)) {
-                try result.append(segment);
+                try result.append(allocator, segment);
             } else if (std.mem.eql(u8, segment.id, "HL") or
                 std.mem.eql(u8, segment.id, "CLM") or
                 std.mem.eql(u8, segment.id, "NM1"))
@@ -265,12 +269,12 @@ pub const X12Document = struct {
     }
 
     pub fn getSegments(self: *const X12Document, id: []const u8, allocator: Allocator) !std.ArrayList(*const Segment) {
-        var result = std.ArrayList(*const Segment).init(allocator);
+        var result: std.ArrayList(*const Segment) = {};
         errdefer result.deinit();
 
         for (self.segments.items) |*segment| {
             if (std.mem.eql(u8, segment.id, id)) {
-                try result.append(segment);
+                try result.append(allocator, segment);
             }
         }
 
