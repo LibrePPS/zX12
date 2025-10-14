@@ -64,20 +64,20 @@ pub const ZX12_Context = struct {
 };
 
 // Exported C API functions
-export fn zx12_create_context() callconv(.C) ?*ZX12_Context {
+export fn zx12_create_context() callconv(.c) ?*ZX12_Context {
     const ctx = ZX12_Context.init(std.heap.c_allocator) catch {
         return null;
     };
     return ctx;
 }
 
-export fn zx12_destroy_context(ctx: ?*ZX12_Context) callconv(.C) void {
+export fn zx12_destroy_context(ctx: ?*ZX12_Context) callconv(.c) void {
     if (ctx) |context| {
         context.deinit();
     }
 }
 
-export fn zx12_load_schema(ctx: ?*ZX12_Context, path: [*c]const u8, path_len: usize, name: [*c]const u8, name_len: usize) callconv(.C) c_int {
+export fn zx12_load_schema(ctx: ?*ZX12_Context, path: [*c]const u8, path_len: usize, name: [*c]const u8, name_len: usize) callconv(.c) c_int {
     if (ctx == null or path == null or name == null) {
         return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
@@ -153,7 +153,7 @@ export fn zx12_parse_x12(
     x12_data_len: usize,
     out_buffer_id: *isize,
     out_length: *isize,
-) callconv(.C) c_int {
+) callconv(.c) c_int {
     if (ctx == null or schema_name == null or x12_data == null) {
         return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
@@ -184,9 +184,12 @@ export fn zx12_parse_x12(
     defer parsed.deinit();
 
     // Convert to JSON
-    const json_str = std.json.stringifyAlloc(context.allocator, parsed.value, .{}) catch {
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
+    var writer = std.Io.Writer.Allocating.init(context.allocator);
+    defer writer.deinit();
+    std.json.Stringify.value(parsed.value, .{}, &writer.writer) catch {
+        return @intFromEnum(ZX12_Error.PARSE_ERROR);
     };
+    const json_str = writer.written();
 
     // Store in buffers map
     const buffer_id = @intFromPtr(json_str.ptr);
@@ -202,7 +205,7 @@ export fn zx12_parse_x12(
     return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn zx12_get_buffer_data(ctx: ?*ZX12_Context, buffer_id: usize, out_buffer: ?[*]u8, buffer_capacity: usize) callconv(.C) c_int {
+export fn zx12_get_buffer_data(ctx: ?*ZX12_Context, buffer_id: usize, out_buffer: ?[*]u8, buffer_capacity: usize) callconv(.c) c_int {
     if (ctx == null or out_buffer == null) {
         return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
@@ -224,7 +227,7 @@ export fn zx12_get_buffer_data(ctx: ?*ZX12_Context, buffer_id: usize, out_buffer
     return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn zx12_free_buffer(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.C) c_int {
+export fn zx12_free_buffer(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.c) c_int {
     if (ctx == null) {
         return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
@@ -240,7 +243,7 @@ export fn zx12_free_buffer(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.C) c
     return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn zx12_free_schema(ctx: ?*ZX12_Context, schema_name: [*c]const u8, schema_name_len: usize) callconv(.C) c_int {
+export fn zx12_free_schema(ctx: ?*ZX12_Context, schema_name: [*c]const u8, schema_name_len: usize) callconv(.c) c_int {
     if (ctx == null or schema_name == null) {
         return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
     }
@@ -272,7 +275,7 @@ export fn zx12_free_schema(ctx: ?*ZX12_Context, schema_name: [*c]const u8, schem
     return @intFromEnum(ZX12_Error.SUCCESS);
 }
 
-export fn zx12_get_error_message(error_code: c_int) callconv(.C) [*:0]const u8 {
+export fn zx12_get_error_message(error_code: c_int) callconv(.c) [*:0]const u8 {
     const err = @as(ZX12_Error, @enumFromInt(error_code));
     return switch (err) {
         .SUCCESS => "Success",
@@ -286,7 +289,7 @@ export fn zx12_get_error_message(error_code: c_int) callconv(.C) [*:0]const u8 {
     };
 }
 
-export fn zx12_get_buffer_size(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.C) c_int {
+export fn zx12_get_buffer_size(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.c) c_int {
     if (ctx == null) {
         return -1;
     }

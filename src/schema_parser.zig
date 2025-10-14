@@ -115,7 +115,7 @@ pub const Schema = struct {
             .version = "",
             .transaction_type = "",
             .header = Header.init(allocator),
-            .loops = std.ArrayList(Loop).init(allocator),
+            .loops = std.ArrayList(Loop){},
             .allocator = allocator,
         };
     }
@@ -126,7 +126,7 @@ pub const Schema = struct {
         for (self.loops.items) |*loop| {
             loop.deinit();
         }
-        self.loops.deinit();
+        self.loops.deinit(self.allocator);
 
         self.allocator.free(self.id);
         self.allocator.free(self.description);
@@ -161,7 +161,7 @@ pub const Schema = struct {
         const loops_json = obj.get("loops").?.array;
         for (loops_json.items) |loop_json| {
             const loop = try Loop.fromValue(allocator, loop_json);
-            try schema.loops.append(loop);
+            try schema.loops.append(allocator, loop);
         }
 
         return schema;
@@ -175,7 +175,7 @@ pub const Header = struct {
 
     pub fn init(allocator: Allocator) Header {
         return Header{
-            .segments = std.ArrayList(HeaderSegment).init(allocator),
+            .segments = std.ArrayList(HeaderSegment){},
             .allocator = allocator,
         };
     }
@@ -184,7 +184,7 @@ pub const Header = struct {
         for (self.segments.items) |*segment| {
             segment.deinit();
         }
-        self.segments.deinit();
+        self.segments.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !Header {
@@ -194,7 +194,7 @@ pub const Header = struct {
         const segments_json = value.object.get("segments").?.array;
         for (segments_json.items) |segment_json| {
             const segment = try HeaderSegment.fromValue(allocator, segment_json);
-            try header.segments.append(segment);
+            try header.segments.append(allocator, segment);
         }
 
         return header;
@@ -212,7 +212,7 @@ pub const HeaderSegment = struct {
         return HeaderSegment{
             .id = "",
             .required = false,
-            .elements = std.ArrayList(Element).init(allocator),
+            .elements = std.ArrayList(Element){},
             .allocator = allocator,
         };
     }
@@ -222,7 +222,7 @@ pub const HeaderSegment = struct {
         for (self.elements.items) |*element| {
             element.deinit();
         }
-        self.elements.deinit();
+        self.elements.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !HeaderSegment {
@@ -240,7 +240,7 @@ pub const HeaderSegment = struct {
             const elements_array = elements_json.array;
             for (elements_array.items) |element_json| {
                 const element = try Element.fromValue(allocator, element_json);
-                try segment.elements.append(element);
+                try segment.elements.append(allocator, element);
             }
         }
 
@@ -264,8 +264,8 @@ pub const Loop = struct {
             .name = "",
             .multiple = false,
             .trigger = Trigger.init(),
-            .segments = std.ArrayList(Segment).init(allocator),
-            .loops = std.ArrayList(Loop).init(allocator),
+            .segments = std.ArrayList(Segment){},
+            .loops = std.ArrayList(Loop){},
             .allocator = allocator,
         };
     }
@@ -278,12 +278,12 @@ pub const Loop = struct {
         for (self.segments.items) |*segment| {
             segment.deinit();
         }
-        self.segments.deinit();
+        self.segments.deinit(self.allocator);
 
         for (self.loops.items) |*loop| {
             loop.deinit();
         }
-        self.loops.deinit();
+        self.loops.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !Loop {
@@ -306,7 +306,7 @@ pub const Loop = struct {
             const segments_array = segments_json.array;
             for (segments_array.items) |segment_json| {
                 const segment = try Segment.fromValue(allocator, segment_json);
-                try loop.segments.append(segment);
+                try loop.segments.append(allocator, segment);
             }
         }
 
@@ -314,7 +314,7 @@ pub const Loop = struct {
             const loops_array = loops_json.array;
             for (loops_array.items) |nested_loop_json| {
                 const nested_loop = try Loop.fromValue(allocator, nested_loop_json);
-                try loop.loops.append(nested_loop);
+                try loop.loops.append(allocator, nested_loop);
             }
         }
 
@@ -378,8 +378,8 @@ pub const Element = struct {
             .position = 0,
             .path = null,
             .expected_value = null,
-            .transforms = std.ArrayList([]const u8).init(allocator),
-            .value_mappings = std.ArrayList(ValueMapping).init(allocator),
+            .transforms = std.ArrayList([]const u8){},
+            .value_mappings = std.ArrayList(ValueMapping){},
             .composite = null,
             .allocator = allocator,
         };
@@ -397,12 +397,12 @@ pub const Element = struct {
         for (self.transforms.items) |transform| {
             self.allocator.free(transform);
         }
-        self.transforms.deinit();
+        self.transforms.deinit(self.allocator);
 
         for (self.value_mappings.items) |*mapping| {
             mapping.deinit();
         }
-        self.value_mappings.deinit();
+        self.value_mappings.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !Element {
@@ -424,7 +424,7 @@ pub const Element = struct {
             const transform_array = transform_json.array;
             for (transform_array.items) |transform_item| {
                 const transform_name = try allocator.dupe(u8, transform_item.string);
-                try element.transforms.append(transform_name);
+                try element.transforms.append(allocator, transform_name);
             }
         }
 
@@ -432,7 +432,7 @@ pub const Element = struct {
             const mappings_array = mappings_json.array;
             for (mappings_array.items) |mapping_json| {
                 const mapping = try ValueMapping.fromValue(allocator, mapping_json);
-                try element.value_mappings.append(mapping);
+                try element.value_mappings.append(allocator, mapping);
             }
         }
 
@@ -512,9 +512,9 @@ pub const ElementPattern = struct {
     pub fn init(allocator: Allocator) ElementPattern {
         return ElementPattern{
             .qualifier_position = 0,
-            .qualifier_values = std.ArrayList([]const u8).init(allocator),
+            .qualifier_values = std.ArrayList([]const u8){},
             .target_collection = "",
-            .component_mappings = std.ArrayList(ComponentMapping).init(allocator),
+            .component_mappings = std.ArrayList(ComponentMapping){},
             .allocator = allocator,
         };
     }
@@ -526,12 +526,12 @@ pub const ElementPattern = struct {
         for (self.qualifier_values.items) |qualifier| {
             self.allocator.free(qualifier);
         }
-        self.qualifier_values.deinit();
+        self.qualifier_values.deinit(self.allocator);
 
         for (self.component_mappings.items) |*mapping| {
             mapping.deinit();
         }
-        self.component_mappings.deinit();
+        self.component_mappings.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !ElementPattern {
@@ -546,7 +546,7 @@ pub const ElementPattern = struct {
             const qualifiers_array = qualifiers_json.array;
             for (qualifiers_array.items) |qualifier_json| {
                 const qualifier = try allocator.dupe(u8, qualifier_json.string);
-                try pattern.qualifier_values.append(qualifier);
+                try pattern.qualifier_values.append(allocator, qualifier);
             }
         }
 
@@ -554,7 +554,7 @@ pub const ElementPattern = struct {
             const mappings_array = mappings_json.array;
             for (mappings_array.items) |mapping_json| {
                 const mapping = try ComponentMapping.fromValue(allocator, mapping_json);
-                try pattern.component_mappings.append(mapping);
+                try pattern.component_mappings.append(allocator, mapping);
             }
         }
 
@@ -609,12 +609,12 @@ pub const Segment = struct {
             .id = "",
             .required = false,
             .multiple = false,
-            .qualifiers = std.ArrayList(Qualifier).init(allocator),
-            .elements = std.ArrayList(Element).init(allocator),
-            .related_segments = std.ArrayList(RelatedSegment).init(allocator),
-            .composite_elements = std.ArrayList(CompositeElement).init(allocator),
+            .qualifiers = std.ArrayList(Qualifier){},
+            .elements = std.ArrayList(Element){},
+            .related_segments = std.ArrayList(RelatedSegment){},
+            .composite_elements = std.ArrayList(CompositeElement){},
             .process_all_elements = false,
-            .element_patterns = std.ArrayList(ElementPattern).init(allocator),
+            .element_patterns = std.ArrayList(ElementPattern){},
             .allocator = allocator,
         };
     }
@@ -624,28 +624,28 @@ pub const Segment = struct {
         for (self.qualifiers.items) |*qualifier| {
             qualifier.deinit();
         }
-        self.qualifiers.deinit();
+        self.qualifiers.deinit(self.allocator);
 
         for (self.elements.items) |*element| {
             element.deinit();
         }
-        self.elements.deinit();
+        self.elements.deinit(self.allocator);
 
         for (self.related_segments.items) |*related| {
             related.deinit();
         }
-        self.related_segments.deinit();
+        self.related_segments.deinit(self.allocator);
 
         for (self.composite_elements.items) |*composite| {
             composite.deinit();
         }
-        self.composite_elements.deinit();
+        self.composite_elements.deinit(self.allocator);
 
         // Free element patterns
         for (self.element_patterns.items) |*pattern| {
             pattern.deinit();
         }
-        self.element_patterns.deinit();
+        self.element_patterns.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !Segment {
@@ -670,7 +670,7 @@ pub const Segment = struct {
             const qualifiers_array = qualifiers_json.array;
             for (qualifiers_array.items) |qualifier_json| {
                 const qualifier = try Qualifier.fromValue(allocator, qualifier_json);
-                try segment.qualifiers.append(qualifier);
+                try segment.qualifiers.append(allocator, qualifier);
             }
         }
 
@@ -679,7 +679,7 @@ pub const Segment = struct {
             const elements_array = elements_json.array;
             for (elements_array.items) |element_json| {
                 const element = try Element.fromValue(allocator, element_json);
-                try segment.elements.append(element);
+                try segment.elements.append(allocator, element);
             }
         }
 
@@ -688,7 +688,7 @@ pub const Segment = struct {
             const related_array = related_json.array;
             for (related_array.items) |related_segment_json| {
                 const related = try RelatedSegment.fromValue(allocator, related_segment_json);
-                try segment.related_segments.append(related);
+                try segment.related_segments.append(allocator, related);
             }
         }
 
@@ -697,7 +697,7 @@ pub const Segment = struct {
             const composite_array = composite_json.array;
             for (composite_array.items) |composite_element_json| {
                 const composite = try CompositeElement.fromValue(allocator, composite_element_json);
-                try segment.composite_elements.append(composite);
+                try segment.composite_elements.append(allocator, composite);
             }
         }
 
@@ -711,7 +711,7 @@ pub const Segment = struct {
             const patterns_array = patterns_json.array;
             for (patterns_array.items) |pattern_json| {
                 const pattern = try ElementPattern.fromValue(allocator, pattern_json);
-                try segment.element_patterns.append(pattern);
+                try segment.element_patterns.append(allocator, pattern);
             }
         }
 
@@ -772,7 +772,7 @@ pub const RelatedSegment = struct {
         return RelatedSegment{
             .id = "",
             .max_distance = 0,
-            .elements = std.ArrayList(Element).init(allocator),
+            .elements = std.ArrayList(Element){},
             .allocator = allocator,
         };
     }
@@ -783,7 +783,7 @@ pub const RelatedSegment = struct {
         for (self.elements.items) |*element| {
             element.deinit();
         }
-        self.elements.deinit();
+        self.elements.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !RelatedSegment {
@@ -798,7 +798,7 @@ pub const RelatedSegment = struct {
             const elements_array = elements_json.array;
             for (elements_array.items) |element_json| {
                 const element = try Element.fromValue(allocator, element_json);
-                try related.elements.append(element);
+                try related.elements.append(allocator, element);
             }
         }
 
@@ -817,7 +817,7 @@ pub const CompositeElement = struct {
         return CompositeElement{
             .position = 0,
             .separator = ':',
-            .parts = std.ArrayList(CompositePart).init(allocator),
+            .parts = std.ArrayList(CompositePart){},
             .allocator = allocator,
         };
     }
@@ -826,7 +826,7 @@ pub const CompositeElement = struct {
         for (self.parts.items) |*part| {
             part.deinit();
         }
-        self.parts.deinit();
+        self.parts.deinit(self.allocator);
     }
 
     pub fn fromValue(allocator: Allocator, value: std.json.Value) !CompositeElement {
@@ -847,7 +847,7 @@ pub const CompositeElement = struct {
             const parts_array = parts_json.array;
             for (parts_array.items) |part_json| {
                 const part = try CompositePart.fromValue(allocator, part_json);
-                try composite.parts.append(part);
+                try composite.parts.append(allocator, part);
             }
         }
 
@@ -905,8 +905,8 @@ pub const LoopRange = struct {
 
 /// Find segments that match a loop's trigger conditions
 fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, loop_range: ?*const LoopRange, allocator: Allocator) !std.ArrayList(usize) {
-    var result = std.ArrayList(usize).init(allocator);
-    errdefer result.deinit();
+    var result = std.ArrayList(usize){};
+    errdefer result.deinit(allocator);
 
     var loop_start: usize = 0;
     var loop_end: usize = document.segments.items.len;
@@ -920,7 +920,7 @@ fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, l
         if (std.mem.eql(u8, segment.id, trigger.segment_id)) {
             // If no value is specified in the trigger, just match on segment ID
             if (trigger.value == null) {
-                try result.append(i);
+                try result.append(allocator, i);
                 continue;
             }
 
@@ -928,7 +928,7 @@ fn findLoopTriggers(document: *const x12.X12Document, trigger: *const Trigger, l
             if (trigger.element_position < segment.elements.items.len) {
                 const element = &segment.elements.items[trigger.element_position];
                 if (std.mem.eql(u8, element.value, trigger.value.?)) {
-                    try result.append(i);
+                    try result.append(allocator, i);
                 }
             }
         }
@@ -971,8 +971,8 @@ fn findLoopRange(document: *const x12.X12Document, trigger_idx: usize, loop: *co
 /// Process a segment within a loop
 fn processLoopSegment(context: *ParseContext, segment_def: Segment, loop_range: LoopRange, loop_obj: *std.json.Value) !void {
     const segment_id = segment_def.id;
-    var segments_found = std.ArrayList(*const x12.Segment).init(context.allocator);
-    defer segments_found.deinit();
+    var segments_found = std.ArrayList(*const x12.Segment){};
+    defer segments_found.deinit(context.allocator);
 
     // Find all matching segments within loop range
     for (context.document.segments.items[loop_range.start..loop_range.end]) |*segment| {
@@ -999,7 +999,7 @@ fn processLoopSegment(context: *ParseContext, segment_def: Segment, loop_range: 
         }
 
         if (qualifier_match) {
-            try segments_found.append(segment);
+            try segments_found.append(context.allocator, segment);
         }
     }
 
@@ -1032,7 +1032,7 @@ fn processLoopSegment(context: *ParseContext, segment_def: Segment, loop_range: 
     // Process found segments with normal logic (for non-element pattern segments)
     if (segment_def.multiple) {
         // Create array for multiple segments
-        var segments_array = std.json.Value{ .array = std.ArrayList(std.json.Value).init(context.allocator) };
+        var segments_array = std.json.Value{ .array = std.array_list.AlignedManaged(std.json.Value, null).init(context.allocator) };
 
         for (segments_found.items) |segment| {
             var segment_obj = std.json.Value{ .object = std.json.ObjectMap.init(context.allocator) };
@@ -1212,14 +1212,14 @@ fn processElementMappings(allocator: Allocator, segment: *const x12.Segment, seg
 fn processLoops(context: *ParseContext, loops: []const Loop, loop_range: ?*const LoopRange) ParserError!void {
     for (loops) |loop| {
         // Find all instances of this loop's trigger
-        const triggers = findLoopTriggers(context.document, &loop.trigger, loop_range, context.allocator) catch return ParserError.LoopError;
-        defer triggers.deinit();
+        var triggers = findLoopTriggers(context.document, &loop.trigger, loop_range, context.allocator) catch return ParserError.LoopError;
+        defer triggers.deinit(context.allocator);
 
         if (triggers.items.len == 0) continue; // No triggers found
 
         // Multiple loops need an array to hold all instances
         if (loop.multiple and triggers.items.len > 0) {
-            var loop_array = std.json.Value{ .array = std.ArrayList(std.json.Value).init(context.allocator) };
+            var loop_array = std.json.Value{ .array = std.array_list.AlignedManaged(std.json.Value, null).init(context.allocator) };
 
             for (triggers.items) |trigger_idx| {
                 // Process one loop instance
@@ -1267,10 +1267,10 @@ fn processElementPatterns(allocator: Allocator, segment: *const x12.Segment, seg
         for (segment.elements.items) |element| {
             //Split the element value into components on the component separator
             var components = std.mem.splitAny(u8, element.value, &[_]u8{':'});
-            var component_array = std.ArrayList([]const u8).init(allocator);
-            defer component_array.deinit();
+            var component_array = std.ArrayList([]const u8){};
+            defer component_array.deinit(allocator);
             while (components.next()) |component| {
-                try component_array.append(component);
+                try component_array.append(allocator, component);
             }
             // Skip elements without components
             if (component_array.items.len <= pattern.qualifier_position) continue;
@@ -1350,7 +1350,7 @@ fn getOrCreateArray(allocator: Allocator, obj: *std.json.Value, path: []const u8
         } else {
             // Last part - create the array
             if (parts.next() == null) {
-                const new_array = std.json.Value{ .array = std.ArrayList(std.json.Value).init(allocator) };
+                const new_array = std.json.Value{ .array = std.array_list.AlignedManaged(std.json.Value, null).init(allocator) };
                 try current.object.put(part, new_array);
                 return current.object.getPtr(part).?;
             } else {

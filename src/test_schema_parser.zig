@@ -12,7 +12,10 @@ fn loadFile(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
     const stat = try file.stat();
     const file_size = stat.size + 1;
 
-    return try file.reader().readAllAlloc(allocator, file_size);
+    const buffer = try allocator.alloc(u8, file_size);
+    defer allocator.free(buffer);
+    var reader = file.reader(buffer);
+    return try reader.interface.readAlloc(allocator, stat.size);
 }
 
 test "Load schema from file and parse X12 document" {
@@ -44,6 +47,11 @@ test "Load schema from file and parse X12 document" {
     var result = try schema_parser.parseWithSchema(allocator, &document, &schema);
     defer result.deinit();
 
+    var writer = std.Io.Writer.Allocating.init(allocator);
+    defer writer.deinit();
+    try std.json.Stringify.value(result.value, .{ .whitespace = .indent_2 }, &writer.writer);
+    std.debug.print("{s}", .{writer.written()});
+
     // 6. Verify a selection of fields from different parts of the document
     const root = result.value.object;
     const interchange = root.get("interchange").?.object;
@@ -62,7 +70,19 @@ test "Load schema from file and parse X12 document" {
 
     // Check if 2000A loop exists
     if (root.get("2000A")) |loop_2000a_value| {
-        const loop_2000a = loop_2000a_value.object;
+        const loop_2000a_val = loop_2000a_value;
+        var loop_2000a: std.json.ObjectMap = undefined;
+        switch (loop_2000a_val) {
+            .object => {
+                loop_2000a = loop_2000a_val.object;
+            },
+            .array => {
+                loop_2000a = loop_2000a_val.array.items[0].object;
+            },
+            else => {
+                return std.json.Error.SyntaxError;
+            },
+        }
 
         // Check billing provider data
         if (loop_2000a.get("billing_provider")) |bp| {
