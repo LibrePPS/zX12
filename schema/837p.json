@@ -1,1502 +1,583 @@
 {
+  "schema_version": "2.0",
+  "transaction": {
     "id": "837P",
-    "description": "Health Care Claim: Professional",
     "version": "005010X222A1",
-    "transaction_type": "837",
-    "header": {
-        "segments": [
-            {
-                "id": "ISA",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "interchange.auth_info_qualifier",
-                        "expected_value": "00"
-                    },
-                    {
-                        "position": 1,
-                        "path": "interchange.auth_info",
-                        "transform": [
-                            "trim_whitespace"
-                        ]
-                    },
-                    {
-                        "position": 2,
-                        "path": "interchange.security_qualifier",
-                        "expected_value": "00"
-                    },
-                    {
-                        "position": 3,
-                        "path": "interchange.security_info",
-                        "transform": [
-                            "trim_whitespace"
-                        ]
-                    },
-                    {
-                        "position": 4,
-                        "path": "interchange.sender_id_qualifier",
-                        "value_mappings": [
-                            {
-                                "value": "ZZ",
-                                "mapped_value": "mutually_defined"
-                            }
-                        ]
-                    },
-                    {
-                        "position": 5,
-                        "path": "interchange.sender_id",
-                        "transform": [
-                            "trim_whitespace"
-                        ]
-                    },
-                    {
-                        "position": 6,
-                        "path": "interchange.receiver_id_qualifier",
-                        "value_mappings": [
-                            {
-                                "value": "ZZ",
-                                "mapped_value": "mutually_defined"
-                            }
-                        ]
-                    },
-                    {
-                        "position": 7,
-                        "path": "interchange.receiver_id",
-                        "transform": [
-                            "trim_whitespace"
-                        ]
-                    },
-                    {
-                        "position": 8,
-                        "path": "interchange.date"
-                    },
-                    {
-                        "position": 9,
-                        "path": "interchange.time"
-                    },
-                    {
-                        "position": 10,
-                        "path": "interchange.repetition_separator"
-                    },
-                    {
-                        "position": 11,
-                        "path": "interchange.version_number",
-                        "expected_value": "00501"
-                    },
-                    {
-                        "position": 12,
-                        "path": "interchange.control_number"
-                    },
-                    {
-                        "position": 13,
-                        "path": "interchange.ack_requested"
-                    },
-                    {
-                        "position": 14,
-                        "path": "interchange.usage_indicator",
-                        "value_mappings": [
-                            {
-                                "value": "P",
-                                "mapped_value": "production"
-                            },
-                            {
-                                "value": "T",
-                                "mapped_value": "test"
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "id": "GS",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "functional_group.functional_id_code",
-                        "expected_value": "HC"
-                    },
-                    {
-                        "position": 1,
-                        "path": "functional_group.sender_code"
-                    },
-                    {
-                        "position": 2,
-                        "path": "functional_group.receiver_code"
-                    },
-                    {
-                        "position": 3,
-                        "path": "functional_group.date"
-                    },
-                    {
-                        "position": 4,
-                        "path": "functional_group.time"
-                    },
-                    {
-                        "position": 5,
-                        "path": "functional_group.control_number"
-                    },
-                    {
-                        "position": 6,
-                        "path": "functional_group.responsible_agency_code",
-                        "expected_value": "X"
-                    },
-                    {
-                        "position": 7,
-                        "path": "functional_group.version",
-                        "expected_value": "005010X222A1"
-                    }
-                ]
-            },
-            {
-                "id": "ST",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "transaction_set.id",
-                        "expected_value": "837"
-                    },
-                    {
-                        "position": 1,
-                        "path": "transaction_set.control_number"
-                    },
-                    {
-                        "position": 2,
-                        "path": "transaction_set.implementation_convention_reference"
-                    }
-                ]
-            },
-            {
-                "id": "BHT",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "beginning_of_hierarchical_transaction.hierarchy_code",
-                        "expected_value": "0019"
-                    },
-                    {
-                        "position": 1,
-                        "path": "beginning_of_hierarchical_transaction.transaction_type_code",
-                        "value_mappings": [
-                            {
-                                "value": "00",
-                                "mapped_value": "original"
-                            },
-                            {
-                                "value": "18",
-                                "mapped_value": "reissue"
-                            },
-                            {
-                                "value": "19",
-                                "mapped_value": "information_copy"
-                            }
-                        ]
-                    },
-                    {
-                        "position": 2,
-                        "path": "beginning_of_hierarchical_transaction.reference_id"
-                    },
-                    {
-                        "position": 3,
-                        "path": "beginning_of_hierarchical_transaction.date"
-                    },
-                    {
-                        "position": 4,
-                        "path": "beginning_of_hierarchical_transaction.time"
-                    },
-                    {
-                        "position": 5,
-                        "path": "beginning_of_hierarchical_transaction.claim_type",
-                        "value_mappings": [
-                            {
-                                "value": "31",
-                                "mapped_value": "subrogation_demand"
-                            },
-                            {
-                                "value": "CH",
-                                "mapped_value": "chargeable"
-                            },
-                            {
-                                "value": "RP",
-                                "mapped_value": "reporting"
-                            }
-                        ]
-                    }
-                ]
-            }
+    "type": "837",
+    "description": "Health Care Claim: Professional"
+  },
+  "transaction_header": {
+    "segments": [
+      {
+        "id": "ISA",
+        "elements": [
+          { "pos": 0, "path": "interchange.auth_info_qualifier", "expect": "00" },
+          { "pos": 1, "path": "interchange.auth_info", "transform": ["trim"] },
+          { "pos": 2, "path": "interchange.security_qualifier", "expect": "00" },
+          { "pos": 3, "path": "interchange.security_info", "transform": ["trim"] },
+          { "pos": 4, "path": "interchange.sender_id_qualifier", "map": { "ZZ": "mutually_defined" } },
+          { "pos": 5, "path": "interchange.sender_id", "transform": ["trim"] },
+          { "pos": 6, "path": "interchange.receiver_id_qualifier", "map": { "ZZ": "mutually_defined" } },
+          { "pos": 7, "path": "interchange.receiver_id", "transform": ["trim"] },
+          { "pos": 8, "path": "interchange.date" },
+          { "pos": 9, "path": "interchange.time" },
+          { "pos": 10, "path": "interchange.repetition_separator" },
+          { "pos": 11, "path": "interchange.version_number", "expect": "00501" },
+          { "pos": 12, "path": "interchange.control_number" },
+          { "pos": 13, "path": "interchange.ack_requested" },
+          { "pos": 14, "path": "interchange.usage_indicator", "map": { "P": "production", "T": "test" } }
         ]
-    },
-    "loops": [
+      },
+      {
+        "id": "GS",
+        "elements": [
+          { "pos": 0, "path": "functional_group.functional_id_code", "expect": "HC" },
+          { "pos": 1, "path": "functional_group.sender_code" },
+          { "pos": 2, "path": "functional_group.receiver_code" },
+          { "pos": 3, "path": "functional_group.date" },
+          { "pos": 4, "path": "functional_group.time" },
+          { "pos": 5, "path": "functional_group.control_number" },
+          { "pos": 6, "path": "functional_group.responsible_agency_code", "expect": "X" },
+          { "pos": 7, "path": "functional_group.version", "expect": "005010X222A1" }
+        ]
+      },
+      {
+        "id": "ST",
+        "elements": [
+          { "pos": 0, "path": "transaction_set.id", "expect": "837" },
+          { "pos": 1, "path": "transaction_set.control_number" },
+          { "pos": 2, "path": "transaction_set.implementation_convention_reference" }
+        ]
+      },
+      {
+        "id": "BHT",
+        "elements": [
+          { "pos": 0, "path": "beginning_of_hierarchical_transaction.hierarchy_code", "expect": "0019" },
+          { "pos": 1, "path": "beginning_of_hierarchical_transaction.transaction_type_code",
+            "map": { "00": "original", "18": "reissue", "19": "information_copy" } },
+          { "pos": 2, "path": "beginning_of_hierarchical_transaction.reference_id" },
+          { "pos": 3, "path": "beginning_of_hierarchical_transaction.date" },
+          { "pos": 4, "path": "beginning_of_hierarchical_transaction.time" },
+          { "pos": 5, "path": "beginning_of_hierarchical_transaction.claim_type",
+            "map": { "31": "subrogation_demand", "CH": "chargeable", "RP": "reporting" } }
+        ]
+      }
+    ]
+  },
+  "transaction_trailer": {
+    "segments": [
+      {
+        "id": "SE",
+        "elements": [
+          { "pos": 0, "path": "transaction_set_trailer.segment_count" },
+          { "pos": 1, "path": "transaction_set_trailer.control_number" }
+        ]
+      },
+      {
+        "id": "GE",
+        "elements": [
+          { "pos": 0, "path": "functional_group_trailer.transaction_set_count" },
+          { "pos": 1, "path": "functional_group_trailer.control_number" }
+        ]
+      },
+      {
+        "id": "IEA",
+        "elements": [
+          { "pos": 0, "path": "interchange_trailer.functional_group_count" },
+          { "pos": 1, "path": "interchange_trailer.control_number" }
+        ]
+      }
+    ]
+  },
+  "sequential_sections": [
+    {
+      "name": "Submitter",
+      "output_path": "submitter",
+      "trigger": { "segment": "NM1", "qualifier": [0, "41"] },
+      "segments": [
         {
-            "id": "1000A",
-            "name": "Submitter Name",
-            "multiple": false,
-            "trigger": {
-                "segment_id": "NM1",
-                "element_position": 0,
-                "value": "41"
-            },
-            "segments": [
-                {
-                    "id": "NM1",
-                    "required": true,
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "submitter.entity_type_qualifier",
-                            "expected_value": "41"
-                        },
-                        {
-                            "position": 1,
-                            "path": "submitter.entity_type",
-                            "value_mappings": [
-                                {
-                                    "value": "1",
-                                    "mapped_value": "person"
-                                },
-                                {
-                                    "value": "2",
-                                    "mapped_value": "organization"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 2,
-                            "path": "submitter.last_name"
-                        },
-                        {
-                            "position": 3,
-                            "path": "submitter.first_name"
-                        },
-                        {
-                            "position": 7,
-                            "path": "submitter.id_code_qualifier",
-                            "value_mappings": [
-                                {
-                                    "value": "46",
-                                    "mapped_value": "electronic_transmitter_id"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 8,
-                            "path": "submitter.id"
-                        }
-                    ]
-                },
-                {
-                    "id": "PER",
-                    "required": true,
-                    "multiple": true,
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "submitter_contact.contact_function_code",
-                            "value_mappings": [
-                                {
-                                    "value": "IC",
-                                    "mapped_value": "information_contact"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 1,
-                            "path": "submitter_contact.name"
-                        },
-                        {
-                            "position": 2,
-                            "path": "submitter_contact.comm_number_qualifier",
-                            "value_mappings": [
-                                {
-                                    "value": "TE",
-                                    "mapped_value": "telephone"
-                                },
-                                {
-                                    "value": "EM",
-                                    "mapped_value": "email"
-                                },
-                                {
-                                    "value": "FX",
-                                    "mapped_value": "fax"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 3,
-                            "path": "submitter_contact.comm_number"
-                        }
-                    ]
-                }
-            ]
+          "id": "NM1",
+          "elements": [
+            { "pos": 0, "path": "entity_type_qualifier", "expect": "41" },
+            { "pos": 1, "path": "entity_type", "map": { "1": "person", "2": "organization" } },
+            { "pos": 2, "path": "last_name" },
+            { "pos": 3, "path": "first_name" },
+            { "pos": 7, "path": "id_code_qualifier", "map": { "46": "electronic_transmitter_id" } },
+            { "pos": 8, "path": "id" }
+          ]
         },
         {
-            "id": "1000B",
-            "name": "Receiver Name",
-            "multiple": false,
-            "trigger": {
-                "segment_id": "NM1",
-                "element_position": 0,
-                "value": "40"
-            },
-            "segments": [
-                {
-                    "id": "NM1",
-                    "required": true,
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "receiver.entity_type_qualifier",
-                            "expected_value": "40"
-                        },
-                        {
-                            "position": 1,
-                            "path": "receiver.entity_type",
-                            "value_mappings": [
-                                {
-                                    "value": "2",
-                                    "mapped_value": "organization"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 2,
-                            "path": "receiver.name"
-                        },
-                        {
-                            "position": 7,
-                            "path": "receiver.id_code_qualifier",
-                            "value_mappings": [
-                                {
-                                    "value": "46",
-                                    "mapped_value": "electronic_transmitter_id"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 8,
-                            "path": "receiver.id"
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "id": "2000A",
-            "name": "Billing Provider Hierarchical Level",
-            "multiple": true,
-            "trigger": {
-                "segment_id": "HL",
-                "element_position": 2,
-                "value": "20"
-            },
-            "segments": [
-                {
-                    "id": "HL",
-                    "required": true,
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "billing_provider.hierarchical_id"
-                        },
-                        {
-                            "position": 1,
-                            "path": "billing_provider.hierarchical_parent_id"
-                        },
-                        {
-                            "position": 2,
-                            "path": "billing_provider.hierarchical_level_code",
-                            "expected_value": "20"
-                        },
-                        {
-                            "position": 3,
-                            "path": "billing_provider.hierarchical_child_code"
-                        }
-                    ]
-                },
-                {
-                    "id": "PRV",
-                    "required": false,
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "billing_provider.provider_code",
-                            "value_mappings": [
-                                {
-                                    "value": "BI",
-                                    "mapped_value": "billing"
-                                },
-                                {
-                                    "value": "PT",
-                                    "mapped_value": "pay_to"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 1,
-                            "path": "billing_provider.reference_id_qualifier",
-                            "value_mappings": [
-                                {
-                                    "value": "PXC",
-                                    "mapped_value": "health_care_provider_taxonomy_code"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 2,
-                            "path": "billing_provider.provider_taxonomy_code"
-                        }
-                    ]
-                },
-                {
-                    "id": "NM1",
-                    "required": true,
-                    "qualifiers": [
-                        {
-                            "position": 0,
-                            "value": "85"
-                        }
-                    ],
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "billing_provider.entity_type_qualifier",
-                            "expected_value": "85"
-                        },
-                        {
-                            "position": 1,
-                            "path": "billing_provider.entity_type",
-                            "value_mappings": [
-                                {
-                                    "value": "1",
-                                    "mapped_value": "person"
-                                },
-                                {
-                                    "value": "2",
-                                    "mapped_value": "organization"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 2,
-                            "path": "billing_provider.last_name"
-                        },
-                        {
-                            "position": 3,
-                            "path": "billing_provider.first_name"
-                        },
-                        {
-                            "position": 4,
-                            "path": "billing_provider.middle_name"
-                        },
-                        {
-                            "position": 5,
-                            "path": "billing_provider.name_prefix"
-                        },
-                        {
-                            "position": 7,
-                            "path": "billing_provider.id_code_qualifier",
-                            "value_mappings": [
-                                {
-                                    "value": "XX",
-                                    "mapped_value": "npi"
-                                },
-                                {
-                                    "value": "FI",
-                                    "mapped_value": "federal_tax_id"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 8,
-                            "path": "billing_provider.id"
-                        }
-                    ],
-                    "related_segments": [
-                        {
-                            "id": "N3",
-                            "max_distance": 5,
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "billing_provider.address1"
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "billing_provider.address2"
-                                }
-                            ]
-                        },
-                        {
-                            "id": "N4",
-                            "max_distance": 6,
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "billing_provider.city"
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "billing_provider.state"
-                                },
-                                {
-                                    "position": 2,
-                                    "path": "billing_provider.zip"
-                                },
-                                {
-                                    "position": 3,
-                                    "path": "billing_provider.country_code"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": "REF",
-                    "required": false,
-                    "multiple": true,
-                    "qualifiers": [
-                        {
-                            "position": 0,
-                            "value": "EI"
-                        }
-                    ],
-                    "elements": [
-                        {
-                            "position": 0,
-                            "path": "billing_provider.reference_code",
-                            "value_mappings": [
-                                {
-                                    "value": "EI",
-                                    "mapped_value": "employer_id"
-                                },
-                                {
-                                    "value": "SY",
-                                    "mapped_value": "ssn"
-                                },
-                                {
-                                    "value": "TJ",
-                                    "mapped_value": "federal_tax_id"
-                                }
-                            ]
-                        },
-                        {
-                            "position": 1,
-                            "path": "billing_provider.tax_id"
-                        }
-                    ]
-                }
-            ],
-            "loops": [
-                {
-                    "id": "2000B",
-                    "name": "Subscriber Hierarchical Level",
-                    "multiple": true,
-                    "trigger": {
-                        "segment_id": "HL",
-                        "element_position": 2,
-                        "value": "22"
-                    },
-                    "segments": [
-                        {
-                            "id": "HL",
-                            "required": true,
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "subscriber.hierarchical_id"
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "subscriber.hierarchical_parent_id"
-                                },
-                                {
-                                    "position": 2,
-                                    "path": "subscriber.hierarchical_level_code",
-                                    "expected_value": "22"
-                                },
-                                {
-                                    "position": 3,
-                                    "path": "subscriber.hierarchical_child_code"
-                                }
-                            ]
-                        },
-                        {
-                            "id": "SBR",
-                            "required": true,
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "subscriber.payer_responsibility",
-                                    "value_mappings": [
-                                        {
-                                            "value": "P",
-                                            "mapped_value": "primary"
-                                        },
-                                        {
-                                            "value": "S",
-                                            "mapped_value": "secondary"
-                                        },
-                                        {
-                                            "value": "T",
-                                            "mapped_value": "tertiary"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "subscriber.individual_relationship",
-                                    "value_mappings": [
-                                        {
-                                            "value": "01",
-                                            "mapped_value": "spouse"
-                                        },
-                                        {
-                                            "value": "18",
-                                            "mapped_value": "self"
-                                        },
-                                        {
-                                            "value": "19",
-                                            "mapped_value": "child"
-                                        },
-                                        {
-                                            "value": "20",
-                                            "mapped_value": "employee"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "position": 2,
-                                    "path": "subscriber.reference_identification"
-                                },
-                                {
-                                    "position": 3,
-                                    "path": "subscriber.policy_name"
-                                },
-                                {
-                                    "position": 8,
-                                    "path": "subscriber.insurance_type",
-                                    "value_mappings": [
-                                        {
-                                            "value": "12",
-                                            "mapped_value": "ppo"
-                                        },
-                                        {
-                                            "value": "13",
-                                            "mapped_value": "hmo"
-                                        },
-                                        {
-                                            "value": "AK",
-                                            "mapped_value": "champva"
-                                        },
-                                        {
-                                            "value": "MB",
-                                            "mapped_value": "medicare_part_b"
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "id": "NM1",
-                            "required": true,
-                            "qualifiers": [
-                                {
-                                    "position": 0,
-                                    "value": "IL"
-                                }
-                            ],
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "subscriber.entity_type_qualifier",
-                                    "expected_value": "IL"
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "subscriber.entity_type",
-                                    "value_mappings": [
-                                        {
-                                            "value": "1",
-                                            "mapped_value": "person"
-                                        },
-                                        {
-                                            "value": "2",
-                                            "mapped_value": "organization"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "position": 2,
-                                    "path": "subscriber.last_name"
-                                },
-                                {
-                                    "position": 3,
-                                    "path": "subscriber.first_name"
-                                },
-                                {
-                                    "position": 4,
-                                    "path": "subscriber.middle_name"
-                                },
-                                {
-                                    "position": 7,
-                                    "path": "subscriber.id_code_qualifier",
-                                    "value_mappings": [
-                                        {
-                                            "value": "MI",
-                                            "mapped_value": "member_id"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "position": 8,
-                                    "path": "subscriber.id"
-                                }
-                            ],
-                            "related_segments": [
-                                {
-                                    "id": "N3",
-                                    "max_distance": 5,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "subscriber.address1"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "subscriber.address2"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "N4",
-                                    "max_distance": 6,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "subscriber.city"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "subscriber.state"
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "subscriber.zip"
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "id": "DMG",
-                            "required": false,
-                            "elements": [
-                                {
-                                    "position": 0,
-                                    "path": "subscriber.date_qualifier",
-                                    "value_mappings": [
-                                        {
-                                            "value": "D8",
-                                            "mapped_value": "date_format_CCYYMMDD"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "position": 1,
-                                    "path": "subscriber.birth_date"
-                                },
-                                {
-                                    "position": 2,
-                                    "path": "subscriber.gender",
-                                    "value_mappings": [
-                                        {
-                                            "value": "F",
-                                            "mapped_value": "female"
-                                        },
-                                        {
-                                            "value": "M",
-                                            "mapped_value": "male"
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ],
-                    "loops": [
-                        {
-                            "id": "2000C",
-                            "name": "Patient Hierarchical Level",
-                            "multiple": false,
-                            "trigger": {
-                                "segment_id": "HL",
-                                "element_position": 2,
-                                "value": "23"
-                            },
-                            "segments": [
-                                {
-                                    "id": "HL",
-                                    "required": true,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "patient.hierarchical_id"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "patient.hierarchical_parent_id"
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "patient.hierarchical_level_code",
-                                            "expected_value": "23"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "PAT",
-                                    "required": false,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "patient.relationship_code",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "01",
-                                                    "mapped_value": "spouse"
-                                                },
-                                                {
-                                                    "value": "19",
-                                                    "mapped_value": "child"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "NM1",
-                                    "required": true,
-                                    "qualifiers": [
-                                        {
-                                            "position": 0,
-                                            "value": "QC"
-                                        }
-                                    ],
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "patient.entity_type_qualifier",
-                                            "expected_value": "QC"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "patient.entity_type",
-                                            "expected_value": "1"
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "patient.last_name"
-                                        },
-                                        {
-                                            "position": 3,
-                                            "path": "patient.first_name"
-                                        },
-                                        {
-                                            "position": 4,
-                                            "path": "patient.middle_name"
-                                        }
-                                    ],
-                                    "related_segments": [
-                                        {
-                                            "id": "N3",
-                                            "max_distance": 5,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "patient.address1"
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "patient.address2"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "N4",
-                                            "max_distance": 6,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "patient.city"
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "patient.state"
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "patient.zip"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "DMG",
-                                    "required": false,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "patient.date_qualifier",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "D8",
-                                                    "mapped_value": "date_format_CCYYMMDD"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "patient.birth_date"
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "patient.gender",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "F",
-                                                    "mapped_value": "female"
-                                                },
-                                                {
-                                                    "value": "M",
-                                                    "mapped_value": "male"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "id": "2300",
-                            "name": "Claim Information",
-                            "multiple": true,
-                            "trigger": {
-                                "segment_id": "CLM",
-                                "element_position": 0
-                            },
-                            "segments": [
-                                {
-                                    "id": "CLM",
-                                    "required": true,
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "claim.claim_id"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "claim.total_charges"
-                                        },
-                                        {
-                                            "position": 4,
-                                            "path": "claim.place_of_service",
-                                            "composite": {
-                                                "separator": ":",
-                                                "index": 1
-                                            }
-                                        },
-                                        {
-                                            "position": 5,
-                                            "path": "claim.frequency_code",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "1",
-                                                    "mapped_value": "original"
-                                                },
-                                                {
-                                                    "value": "7",
-                                                    "mapped_value": "replacement"
-                                                },
-                                                {
-                                                    "value": "8",
-                                                    "mapped_value": "void"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "DTP",
-                                    "required": false,
-                                    "multiple": true,
-                                    "qualifiers": [
-                                        {
-                                            "position": 0,
-                                            "value": "434"
-                                        }
-                                    ],
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "claim.date_qualifier",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "304",
-                                                    "mapped_value": "latest_visit_date"
-                                                },
-                                                {
-                                                    "value": "431",
-                                                    "mapped_value": "onset_date"
-                                                },
-                                                {
-                                                    "value": "434",
-                                                    "mapped_value": "statement_dates"
-                                                },
-                                                {
-                                                    "value": "435",
-                                                    "mapped_value": "admission_date"
-                                                },
-                                                {
-                                                    "value": "096",
-                                                    "mapped_value": "discharge_date"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "claim.date_format_qualifier",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "D8",
-                                                    "mapped_value": "CCYYMMDD"
-                                                },
-                                                {
-                                                    "value": "RD8",
-                                                    "mapped_value": "range_CCYYMMDD_CCYYMMDD"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "claim.service_date"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "HI",
-                                    "required": false,
-                                    "process_all_elements": true,
-                                    "element_patterns": [
-                                        {
-                                            "qualifier_position": 0,
-                                            "qualifier_values": [
-                                                "ABK",
-                                                "ABF"
-                                            ],
-                                            "target_collection": "diagnosis_codes",
-                                            "component_mappings": [
-                                                {
-                                                    "component_position": 0,
-                                                    "target_field": "qualifier"
-                                                },
-                                                {
-                                                    "component_position": 1,
-                                                    "target_field": "code"
-                                                },
-                                                {
-                                                    "component_position": 8,
-                                                    "target_field": "poa"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "qualifier_position": 0,
-                                            "qualifier_values": [
-                                                "BG"
-                                            ],
-                                            "target_collection": "condition_codes",
-                                            "component_mappings": [
-                                                {
-                                                    "component_position": 0,
-                                                    "target_field": "qualifier"
-                                                },
-                                                {
-                                                    "component_position": 1,
-                                                    "target_field": "code"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "qualifier_position": 0,
-                                            "qualifier_values": [
-                                                "BH"
-                                            ],
-                                            "target_collection": "occurrence_codes",
-                                            "component_mappings": [
-                                                {
-                                                    "component_position": 0,
-                                                    "target_field": "qualifier"
-                                                },
-                                                {
-                                                    "component_position": 1,
-                                                    "target_field": "code"
-                                                },
-                                                {
-                                                    "component_position": 2,
-                                                    "target_field": "date_format"
-                                                },
-                                                {
-                                                    "component_position": 3,
-                                                    "target_field": "date"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "qualifier_position": 0,
-                                            "qualifier_values": [
-                                                "BE"
-                                            ],
-                                            "target_collection": "value_codes",
-                                            "component_mappings": [
-                                                {
-                                                    "component_position": 0,
-                                                    "target_field": "qualifier"
-                                                },
-                                                {
-                                                    "component_position": 1,
-                                                    "target_field": "code"
-                                                },
-                                                {
-                                                    "component_position": 4,
-                                                    "target_field": "amount"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": "NM1",
-                                    "required": false,
-                                    "qualifiers": [
-                                        {
-                                            "position": 0,
-                                            "value": "82"
-                                        }
-                                    ],
-                                    "elements": [
-                                        {
-                                            "position": 0,
-                                            "path": "claim.rendering_provider_qualifier",
-                                            "expected_value": "82"
-                                        },
-                                        {
-                                            "position": 1,
-                                            "path": "claim.rendering_provider_type",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "1",
-                                                    "mapped_value": "person"
-                                                },
-                                                {
-                                                    "value": "2",
-                                                    "mapped_value": "organization"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "position": 2,
-                                            "path": "claim.rendering_provider_last_name"
-                                        },
-                                        {
-                                            "position": 3,
-                                            "path": "claim.rendering_provider_first_name"
-                                        },
-                                        {
-                                            "position": 7,
-                                            "path": "claim.rendering_provider_id_qualifier",
-                                            "value_mappings": [
-                                                {
-                                                    "value": "XX",
-                                                    "mapped_value": "npi"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "position": 8,
-                                            "path": "claim.rendering_provider_id"
-                                        }
-                                    ]
-                                }
-                            ],
-                            "loops": [
-                                {
-                                    "id": "2400",
-                                    "name": "Service Line",
-                                    "multiple": true,
-                                    "trigger": {
-                                        "segment_id": "LX",
-                                        "element_position": 0
-                                    },
-                                    "segments": [
-                                        {
-                                            "id": "LX",
-                                            "required": true,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.line_number"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "SV1",
-                                            "required": true,
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.procedure_code",
-                                                    "composite": {
-                                                        "separator": ":",
-                                                        "index": 1
-                                                    }
-                                                },
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.procedure_qualifier",
-                                                    "composite": {
-                                                        "separator": ":",
-                                                        "index": 0
-                                                    },
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "HC",
-                                                            "mapped_value": "hcpcs_cpt"
-                                                        },
-                                                        {
-                                                            "value": "AD",
-                                                            "mapped_value": "uniform_billing"
-                                                        },
-                                                        {
-                                                            "value": "ER",
-                                                            "mapped_value": "revenue_code"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "service_line.charge_amount"
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "service_line.unit_basis",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "UN",
-                                                            "mapped_value": "unit"
-                                                        },
-                                                        {
-                                                            "value": "MJ",
-                                                            "mapped_value": "minutes"
-                                                        },
-                                                        {
-                                                            "value": "DA",
-                                                            "mapped_value": "days"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 3,
-                                                    "path": "service_line.service_units"
-                                                },
-                                                {
-                                                    "position": 4,
-                                                    "path": "service_line.place_of_service"
-                                                },
-                                                {
-                                                    "position": 6,
-                                                    "path": "service_line.diagnosis_pointers"
-                                                },
-                                                {
-                                                    "position": 11,
-                                                    "path": "service_line.emergency_indicator",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "Y",
-                                                            "mapped_value": "true"
-                                                        },
-                                                        {
-                                                            "value": "N",
-                                                            "mapped_value": "false"
-                                                        }
-                                                    ]
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "DTP",
-                                            "required": true,
-                                            "qualifiers": [
-                                                {
-                                                    "position": 0,
-                                                    "value": "472"
-                                                }
-                                            ],
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.date_qualifier",
-                                                    "expected_value": "472"
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "service_line.date_format_qualifier",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "D8",
-                                                            "mapped_value": "CCYYMMDD"
-                                                        },
-                                                        {
-                                                            "value": "RD8",
-                                                            "mapped_value": "range_CCYYMMDD_CCYYMMDD"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "service_line.service_date"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "REF",
-                                            "required": false,
-                                            "qualifiers": [
-                                                {
-                                                    "position": 0,
-                                                    "value": "6R"
-                                                }
-                                            ],
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.line_item_control_number_qualifier",
-                                                    "expected_value": "6R"
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "service_line.line_item_control_number"
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            "id": "NM1",
-                                            "required": false,
-                                            "qualifiers": [
-                                                {
-                                                    "position": 0,
-                                                    "value": "82"
-                                                }
-                                            ],
-                                            "elements": [
-                                                {
-                                                    "position": 0,
-                                                    "path": "service_line.rendering_provider_qualifier",
-                                                    "expected_value": "82"
-                                                },
-                                                {
-                                                    "position": 1,
-                                                    "path": "service_line.rendering_provider_type",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "1",
-                                                            "mapped_value": "person"
-                                                        },
-                                                        {
-                                                            "value": "2",
-                                                            "mapped_value": "organization"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 2,
-                                                    "path": "service_line.rendering_provider_last_name"
-                                                },
-                                                {
-                                                    "position": 3,
-                                                    "path": "service_line.rendering_provider_first_name"
-                                                },
-                                                {
-                                                    "position": 7,
-                                                    "path": "service_line.rendering_provider_id_qualifier",
-                                                    "value_mappings": [
-                                                        {
-                                                            "value": "XX",
-                                                            "mapped_value": "npi"
-                                                        }
-                                                    ]
-                                                },
-                                                {
-                                                    "position": 8,
-                                                    "path": "service_line.rendering_provider_id"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
+          "id": "PER",
+          "multiple": true,
+          "output_array": "contacts",
+          "elements": [
+            { "pos": 0, "path": "contact_function_code", "map": { "IC": "information_contact" } },
+            { "pos": 1, "path": "name" },
+            { "pos": 2, "path": "comm_number_qualifier", "map": { "TE": "telephone", "EM": "email", "FX": "fax" } },
+            { "pos": 3, "path": "comm_number" }
+          ]
         }
-    ],
-    "trailers": {
-        "segments": [
-            {
-                "id": "SE",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "transaction_set_trailer.segment_count"
-                    },
-                    {
-                        "position": 1,
-                        "path": "transaction_set_trailer.control_number"
-                    }
-                ]
-            },
-            {
-                "id": "GE",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "functional_group_trailer.transaction_set_count"
-                    },
-                    {
-                        "position": 1,
-                        "path": "functional_group_trailer.control_number"
-                    }
-                ]
-            },
-            {
-                "id": "IEA",
-                "required": true,
-                "elements": [
-                    {
-                        "position": 0,
-                        "path": "interchange_control_trailer.functional_group_count"
-                    },
-                    {
-                        "position": 1,
-                        "path": "interchange_control_trailer.control_number"
-                    }
-                ]
-            }
-        ]
+      ]
+    },
+    {
+      "name": "Receiver",
+      "output_path": "receiver",
+      "trigger": { "segment": "NM1", "qualifier": [0, "40"] },
+      "segments": [
+        {
+          "id": "NM1",
+          "elements": [
+            { "pos": 0, "path": "entity_type_qualifier", "expect": "40" },
+            { "pos": 1, "path": "entity_type", "map": { "2": "organization" } },
+            { "pos": 2, "path": "name" },
+            { "pos": 7, "path": "id_code_qualifier", "map": { "46": "electronic_transmitter_id" } },
+            { "pos": 8, "path": "id" }
+          ]
+        }
+      ]
     }
+  ],
+  "hierarchical_structure": {
+    "output_array": "billing_providers",
+    "levels": {
+      "20": {
+        "name": "Billing Provider",
+        "segments": [
+          {
+            "id": "HL",
+            "elements": [
+              { "pos": 0, "path": "hierarchical_id" },
+              { "pos": 1, "path": "hierarchical_parent_id" },
+              { "pos": 2, "path": "hierarchical_level_code", "expect": "20" },
+              { "pos": 3, "path": "hierarchical_child_code" }
+            ]
+          },
+          {
+            "id": "PRV",
+            "optional": true,
+            "elements": [
+              { "pos": 0, "path": "provider_code", "map": { "BI": "billing", "PT": "pay_to" } },
+              { "pos": 1, "path": "reference_id_qualifier", "map": { "PXC": "health_care_provider_taxonomy_code" } },
+              { "pos": 2, "path": "provider_taxonomy_code" }
+            ]
+          },
+          {
+            "id": "NM1",
+            "qualifier": [0, "85"],
+            "group": ["NM1", "N3", "N4", "REF", "PER"],
+            "elements": [
+              { "seg": "NM1", "pos": 0, "path": "entity_type_qualifier", "expect": "85" },
+              { "seg": "NM1", "pos": 1, "path": "entity_type", "map": { "1": "person", "2": "organization" } },
+              { "seg": "NM1", "pos": 2, "path": "last_name" },
+              { "seg": "NM1", "pos": 3, "path": "first_name" },
+              { "seg": "NM1", "pos": 4, "path": "middle_name" },
+              { "seg": "NM1", "pos": 5, "path": "name_prefix" },
+              { "seg": "NM1", "pos": 7, "path": "id_code_qualifier", "map": { "XX": "npi", "FI": "federal_tax_id" } },
+              { "seg": "NM1", "pos": 8, "path": "id" },
+              { "seg": "N3", "pos": 0, "path": "address1" },
+              { "seg": "N3", "pos": 1, "path": "address2" },
+              { "seg": "N4", "pos": 0, "path": "city" },
+              { "seg": "N4", "pos": 1, "path": "state" },
+              { "seg": "N4", "pos": 2, "path": "zip" },
+              { "seg": "N4", "pos": 3, "path": "country_code" },
+              { "seg": "REF", "pos": 0, "path": "reference_code", "map": { "EI": "employer_id", "SY": "ssn", "TJ": "federal_tax_id" } },
+              { "seg": "REF", "pos": 1, "path": "tax_id" },
+              { "seg": "PER", "pos": 1, "path": "contact_name" },
+              { "seg": "PER", "pos": 3, "path": "contact_phone" }
+            ]
+          }
+        ],
+        "child_levels": ["22"]
+      },
+      "22": {
+        "name": "Subscriber",
+        "output_array": "subscribers",
+        "segments": [
+          {
+            "id": "HL",
+            "elements": [
+              { "pos": 0, "path": "hierarchical_id" },
+              { "pos": 1, "path": "hierarchical_parent_id" },
+              { "pos": 2, "path": "hierarchical_level_code", "expect": "22" },
+              { "pos": 3, "path": "hierarchical_child_code" }
+            ]
+          },
+          {
+            "id": "SBR",
+            "elements": [
+              { "pos": 0, "path": "payer_responsibility", "map": { "P": "primary", "S": "secondary", "T": "tertiary" } },
+              { "pos": 1, "path": "individual_relationship", "map": { "01": "spouse", "18": "self", "19": "child", "20": "employee" } },
+              { "pos": 2, "path": "reference_identification" },
+              { "pos": 3, "path": "policy_name" },
+              { "pos": 8, "path": "insurance_type", "map": {
+                "12": "ppo", "13": "hmo", "14": "epo", "15": "indemnity",
+                "16": "hmo_medicare_risk", "AM": "automobile_medical",
+                "AP": "auto_personal_injury", "BL": "blue_cross_blue_shield",
+                "CH": "champus", "CI": "commercial_insurance", "DS": "disability",
+                "HM": "health_maintenance_organization", "LM": "liability_medical",
+                "MA": "medicare_part_a", "MB": "medicare_part_b", "MC": "medicaid",
+                "OF": "other_federal_program", "TV": "title_v", "VA": "veterans_affairs",
+                "WC": "workers_comp", "ZZ": "mutually_defined"
+              } }
+            ]
+          },
+          {
+            "id": "NM1",
+            "qualifier": [0, "IL"],
+            "group": ["NM1", "N3", "N4", "DMG"],
+            "elements": [
+              { "seg": "NM1", "pos": 0, "path": "entity_type_qualifier", "expect": "IL" },
+              { "seg": "NM1", "pos": 1, "path": "entity_type", "map": { "1": "person", "2": "organization" } },
+              { "seg": "NM1", "pos": 2, "path": "last_name" },
+              { "seg": "NM1", "pos": 3, "path": "first_name" },
+              { "seg": "NM1", "pos": 4, "path": "middle_name" },
+              { "seg": "NM1", "pos": 7, "path": "id_code_qualifier", "map": { "MI": "member_id" } },
+              { "seg": "NM1", "pos": 8, "path": "id" },
+              { "seg": "N3", "pos": 0, "path": "address1" },
+              { "seg": "N3", "pos": 1, "path": "address2" },
+              { "seg": "N4", "pos": 0, "path": "city" },
+              { "seg": "N4", "pos": 1, "path": "state" },
+              { "seg": "N4", "pos": 2, "path": "zip" },
+              { "seg": "DMG", "pos": 1, "path": "birth_date" },
+              { "seg": "DMG", "pos": 2, "path": "gender", "map": { "F": "female", "M": "male" } }
+            ]
+          },
+          {
+            "id": "NM1",
+            "qualifier": [0, "PR"],
+            "group": ["NM1", "N3", "N4"],
+            "output_prefix": "payer",
+            "elements": [
+              { "seg": "NM1", "pos": 0, "path": "entity_type_qualifier", "expect": "PR" },
+              { "seg": "NM1", "pos": 1, "path": "entity_type", "expect": "2" },
+              { "seg": "NM1", "pos": 2, "path": "name" },
+              { "seg": "NM1", "pos": 7, "path": "id_code_qualifier", "map": { "PI": "payer_id", "XV": "health_care_financing_administration" } },
+              { "seg": "NM1", "pos": 8, "path": "id" },
+              { "seg": "N3", "pos": 0, "path": "address1" },
+              { "seg": "N3", "pos": 1, "path": "address2" },
+              { "seg": "N4", "pos": 0, "path": "city" },
+              { "seg": "N4", "pos": 1, "path": "state" },
+              { "seg": "N4", "pos": 2, "path": "zip" }
+            ]
+          }
+        ],
+        "child_levels": ["23"],
+        "non_hierarchical_loops": [
+          {
+            "name": "Claims",
+            "trigger": "CLM",
+            "output_array": "claims",
+            "segments": [
+              {
+                "id": "CLM",
+                "elements": [
+                  { "pos": 0, "path": "claim_id" },
+                  { "pos": 1, "path": "total_charges" },
+                  { "pos": 4, "path": "facility_code", "composite": [0] },
+                  { "pos": 4, "path": "facility_qualifier", "composite": [1] },
+                  { "pos": 4, "path": "frequency_code", "composite": [2] },
+                  { "pos": 5, "path": "provider_signature_indicator", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 6, "path": "assignment_plan", "map": { "A": "assigned", "B": "assignment_accepted", "C": "not_assigned" } },
+                  { "pos": 7, "path": "benefits_assignment", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 8, "path": "release_info", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 9, "path": "patient_signature_source", "map": { "P": "patient_signature_on_file" } }
+                ]
+              },
+              {
+                "id": "DTP",
+                "multiple": true,
+                "output_array": "dates",
+                "elements": [
+                  { "pos": 0, "path": "qualifier", "map": {
+                    "431": "onset_current_illness",
+                    "434": "statement_period",
+                    "435": "admission_date",
+                    "439": "accident_date",
+                    "453": "acute_manifestation",
+                    "454": "initial_treatment",
+                    "471": "prescription_date",
+                    "472": "service_date"
+                  } },
+                  { "pos": 1, "path": "format_qualifier", "map": { "D8": "date", "RD8": "date_range" } },
+                  { "pos": 2, "path": "date" }
+                ]
+              },
+              {
+                "id": "HI",
+                "repeating_elements": {
+                  "all": true,
+                  "separator": ":",
+                  "patterns": [
+                    {
+                      "when_qualifier": ["ABK", "ABF", "ABJ"],
+                      "output_array": "diagnosis_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 8, "name": "poa" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BG"],
+                      "output_array": "condition_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BH"],
+                      "output_array": "occurrence_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 2, "name": "date_format" },
+                        { "component": 3, "name": "date" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BE"],
+                      "output_array": "value_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 4, "name": "amount" }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "NM1",
+                "qualifier": [0, "82"],
+                "optional": true,
+                "output_prefix": "rendering_provider",
+                "elements": [
+                  { "pos": 0, "path": "qualifier", "expect": "82" },
+                  { "pos": 1, "path": "type", "map": { "1": "person", "2": "organization" } },
+                  { "pos": 2, "path": "last_name" },
+                  { "pos": 3, "path": "first_name" },
+                  { "pos": 7, "path": "id_qualifier", "map": { "XX": "npi" } },
+                  { "pos": 8, "path": "id" }
+                ]
+              }
+            ],
+            "nested_loops": [
+              {
+                "name": "Service Lines",
+                "trigger": "LX",
+                "output_array": "service_lines",
+                "segments": [
+                  {
+                    "id": "LX",
+                    "elements": [
+                      { "pos": 0, "path": "line_number" }
+                    ]
+                  },
+                  {
+                    "id": "SV1",
+                    "elements": [
+                      { "pos": 0, "path": "procedure_qualifier", "composite": [0], "map": { "HC": "hcpcs_cpt", "AD": "uniform_billing", "ER": "revenue_code" } },
+                      { "pos": 0, "path": "procedure_code", "composite": [1] },
+                      { "pos": 1, "path": "charge_amount" },
+                      { "pos": 2, "path": "unit_basis", "map": { "UN": "unit", "MJ": "minutes" } },
+                      { "pos": 3, "path": "quantity" },
+                      { "pos": 6, "path": "diagnosis_pointer" }
+                    ]
+                  },
+                  {
+                    "id": "DTP",
+                    "optional": true,
+                    "elements": [
+                      { "pos": 0, "path": "qualifier", "map": { "472": "service_date" } },
+                      { "pos": 1, "path": "format_qualifier", "map": { "D8": "date", "RD8": "date_range" } },
+                      { "pos": 2, "path": "date" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "23": {
+        "name": "Patient",
+        "output_array": "patients",
+        "segments": [
+          {
+            "id": "HL",
+            "elements": [
+              { "pos": 0, "path": "hierarchical_id" },
+              { "pos": 1, "path": "hierarchical_parent_id" },
+              { "pos": 2, "path": "hierarchical_level_code", "expect": "23" }
+            ]
+          },
+          {
+            "id": "PAT",
+            "optional": true,
+            "elements": [
+              { "pos": 0, "path": "relationship_code", "map": { "01": "spouse", "19": "child" } }
+            ]
+          },
+          {
+            "id": "NM1",
+            "qualifier": [0, "QC"],
+            "group": ["NM1", "N3", "N4", "DMG"],
+            "elements": [
+              { "seg": "NM1", "pos": 0, "path": "entity_type_qualifier", "expect": "QC" },
+              { "seg": "NM1", "pos": 1, "path": "entity_type", "expect": "1" },
+              { "seg": "NM1", "pos": 2, "path": "last_name" },
+              { "seg": "NM1", "pos": 3, "path": "first_name" },
+              { "seg": "NM1", "pos": 4, "path": "middle_name" },
+              { "seg": "N3", "pos": 0, "path": "address1" },
+              { "seg": "N3", "pos": 1, "path": "address2" },
+              { "seg": "N4", "pos": 0, "path": "city" },
+              { "seg": "N4", "pos": 1, "path": "state" },
+              { "seg": "N4", "pos": 2, "path": "zip" },
+              { "seg": "DMG", "pos": 1, "path": "birth_date" },
+              { "seg": "DMG", "pos": 2, "path": "gender", "map": { "F": "female", "M": "male" } }
+            ]
+          }
+        ],
+        "child_levels": [],
+        "non_hierarchical_loops": [
+          {
+            "name": "Claims",
+            "trigger": "CLM",
+            "output_array": "claims",
+            "segments": [
+              {
+                "id": "CLM",
+                "elements": [
+                  { "pos": 0, "path": "claim_id" },
+                  { "pos": 1, "path": "total_charges" },
+                  { "pos": 4, "path": "facility_code", "composite": [0] },
+                  { "pos": 4, "path": "facility_qualifier", "composite": [1] },
+                  { "pos": 4, "path": "frequency_code", "composite": [2] },
+                  { "pos": 5, "path": "provider_signature_indicator", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 6, "path": "assignment_plan", "map": { "A": "assigned", "B": "assignment_accepted", "C": "not_assigned" } },
+                  { "pos": 7, "path": "benefits_assignment", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 8, "path": "release_info", "map": { "Y": "yes", "N": "no" } },
+                  { "pos": 9, "path": "patient_signature_source", "map": { "P": "patient_signature_on_file" } }
+                ]
+              },
+              {
+                "id": "DTP",
+                "multiple": true,
+                "output_array": "dates",
+                "elements": [
+                  { "pos": 0, "path": "qualifier", "map": {
+                    "431": "onset_current_illness",
+                    "434": "statement_period",
+                    "435": "admission_date",
+                    "439": "accident_date",
+                    "453": "acute_manifestation",
+                    "454": "initial_treatment",
+                    "471": "prescription_date",
+                    "472": "service_date"
+                  } },
+                  { "pos": 1, "path": "format_qualifier", "map": { "D8": "date", "RD8": "date_range" } },
+                  { "pos": 2, "path": "date" }
+                ]
+              },
+              {
+                "id": "HI",
+                "repeating_elements": {
+                  "all": true,
+                  "separator": ":",
+                  "patterns": [
+                    {
+                      "when_qualifier": ["ABK", "ABF", "ABJ"],
+                      "output_array": "diagnosis_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 8, "name": "poa" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BG"],
+                      "output_array": "condition_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BH"],
+                      "output_array": "occurrence_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 2, "name": "date_format" },
+                        { "component": 3, "name": "date" }
+                      ]
+                    },
+                    {
+                      "when_qualifier": ["BE"],
+                      "output_array": "value_codes",
+                      "fields": [
+                        { "component": 0, "name": "qualifier" },
+                        { "component": 1, "name": "code" },
+                        { "component": 4, "name": "amount" }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "NM1",
+                "qualifier": [0, "82"],
+                "optional": true,
+                "output_prefix": "rendering_provider",
+                "elements": [
+                  { "pos": 0, "path": "qualifier", "expect": "82" },
+                  { "pos": 1, "path": "type", "map": { "1": "person", "2": "organization" } },
+                  { "pos": 2, "path": "last_name" },
+                  { "pos": 3, "path": "first_name" },
+                  { "pos": 7, "path": "id_qualifier", "map": { "XX": "npi" } },
+                  { "pos": 8, "path": "id" }
+                ]
+              }
+            ],
+            "nested_loops": [
+              {
+                "name": "Service Lines",
+                "trigger": "LX",
+                "output_array": "service_lines",
+                "segments": [
+                  {
+                    "id": "LX",
+                    "elements": [
+                      { "pos": 0, "path": "line_number" }
+                    ]
+                  },
+                  {
+                    "id": "SV1",
+                    "elements": [
+                      { "pos": 0, "path": "procedure_qualifier", "composite": [0], "map": { "HC": "hcpcs_cpt", "AD": "uniform_billing", "ER": "revenue_code" } },
+                      { "pos": 0, "path": "procedure_code", "composite": [1] },
+                      { "pos": 1, "path": "charge_amount" },
+                      { "pos": 2, "path": "unit_basis", "map": { "UN": "unit", "MJ": "minutes" } },
+                      { "pos": 3, "path": "quantity" },
+                      { "pos": 6, "path": "diagnosis_pointer" }
+                    ]
+                  },
+                  {
+                    "id": "DTP",
+                    "optional": true,
+                    "elements": [
+                      { "pos": 0, "path": "qualifier", "map": { "472": "service_date" } },
+                      { "pos": 1, "path": "format_qualifier", "map": { "D8": "date", "RD8": "date_range" } },
+                      { "pos": 2, "path": "date" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
 }

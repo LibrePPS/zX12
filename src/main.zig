@@ -1,303 +1,432 @@
 const std = @import("std");
-const x12 = @import("parser.zig");
-const schema_parser = @import("schema_parser.zig");
+const document_processor = @import("x12_parser/document_processor.zig");
 
-// Export modules for native zig use
-pub const parser = x12;
-pub const schema_parser_mod = schema_parser;
+// ============================================================================
+// C API for X12 Document Processing
+// ============================================================================
 
-// Handle-based design with proper error handling
+/// Opaque handle to processed JSON output
+pub const ZX12_Output = opaque {};
+
+/// Error codes returned by C API functions
 pub const ZX12_Error = enum(c_int) {
-    SUCCESS = 0,
-    INVALID_ARGUMENT = -1,
-    FILE_NOT_FOUND = -2,
-    MEMORY_ERROR = -3,
-    PARSE_ERROR = -4,
-    SCHEMA_NOT_FOUND = -5,
-    BUFFER_NOT_FOUND = -6,
-    UNKNOWN_ERROR = -99,
+    Success = 0,
+    OutOfMemory = 1,
+    InvalidISA = 2,
+    FileNotFound = 3,
+    ParseError = 4,
+    SchemaLoadError = 5,
+    UnknownHLLevel = 6,
+    PathConflict = 7,
+    InvalidArgument = 8,
+    UnknownError = 99,
 };
 
-// Context struct to replace globals
-pub const ZX12_Context = struct {
-    allocator: std.mem.Allocator,
-    schemas: std.StringArrayHashMap(schema_parser.Schema),
-    schema_names: std.StringArrayHashMap([]const u8),
-    buffers: std.AutoArrayHashMap(usize, []const u8),
-
-    pub fn init(allocator: std.mem.Allocator) !*ZX12_Context {
-        const ctx = try allocator.create(ZX12_Context);
-        ctx.* = ZX12_Context{
-            .allocator = allocator,
-            .schemas = std.StringArrayHashMap(schema_parser.Schema).init(allocator),
-            .schema_names = std.StringArrayHashMap([]const u8).init(allocator),
-            .buffers = std.AutoArrayHashMap(usize, []const u8).init(allocator),
-        };
-        return ctx;
-    }
-
-    pub fn deinit(self: *ZX12_Context) void {
-        // Free all schemas
-        var schema_it = self.schemas.iterator();
-        while (schema_it.next()) |entry| {
-            entry.value_ptr.deinit();
-        }
-        self.schemas.deinit();
-
-        // Free all schema names
-        var name_it = self.schema_names.iterator();
-        while (name_it.next()) |entry| {
-            self.allocator.free(entry.value_ptr.*);
-        }
-        self.schema_names.deinit();
-
-        // Free all buffers
-        var buffer_it = self.buffers.iterator();
-        while (buffer_it.next()) |entry| {
-            self.allocator.free(entry.value_ptr.*);
-        }
-        self.buffers.deinit();
-
-        // Free the context itself
-        self.allocator.destroy(self);
-    }
-};
-
-// Exported C API functions
-export fn zx12_create_context() callconv(.c) ?*ZX12_Context {
-    const ctx = ZX12_Context.init(std.heap.c_allocator) catch {
-        return null;
+/// Convert Zig error to C error code
+fn errorToCode(err: anyerror) ZX12_Error {
+    return switch (err) {
+        error.OutOfMemory => .OutOfMemory,
+        error.InvalidISA => .InvalidISA,
+        error.FileNotFound => .FileNotFound,
+        error.ParseError => .ParseError,
+        error.SchemaLoadError => .SchemaLoadError,
+        error.UnknownHLLevel => .UnknownHLLevel,
+        error.PathConflict => .PathConflict,
+        else => .UnknownError,
     };
-    return ctx;
 }
 
-export fn zx12_destroy_context(ctx: ?*ZX12_Context) callconv(.c) void {
-    if (ctx) |context| {
-        context.deinit();
+/// Global allocator for C API (uses C allocator for simplicity and thread-safety)
+fn getGlobalAllocator() std.mem.Allocator {
+    // Use c_allocator when linking with libc, otherwise use page_allocator for tests
+    if (@import("builtin").link_libc) {
+        return std.heap.c_allocator;
+    } else {
+        return std.heap.page_allocator;
     }
 }
 
-export fn zx12_load_schema(ctx: ?*ZX12_Context, path: [*c]const u8, path_len: usize, name: [*c]const u8, name_len: usize) callconv(.c) c_int {
-    if (ctx == null or path == null or name == null) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
+/// Initialize the zX12 library
+/// Must be called before any other functions
+/// Returns 0 on success, error code otherwise
+export fn zx12_init() c_int {
+    // Nothing to do with c_allocator
+    return @intFromEnum(ZX12_Error.Success);
+}
 
-    const context = ctx.?;
+/// Cleanup the zX12 library
+/// Should be called when done using the library
+export fn zx12_deinit() void {
+    // Nothing to do with c_allocator
+}
 
-    if (name_len == 0 or name_len >= 128) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
+/// Process an X12 document and convert to JSON
+///
+/// @param x12_file_path Path to the X12 file to process (null-terminated C string)
+/// @param schema_path Path to the schema JSON file (null-terminated C string)
+/// @param output_ptr Pointer to receive the output handle (must not be null)
+/// @return 0 on success, error code otherwise
+///
+/// Example:
+///   ZX12_Output* output = NULL;
+///   int result = zx12_process_document("input.x12", "schema/837p.json", &output);
+///   if (result == 0) {
+///     const char* json = zx12_get_output(output);
+///     printf("%s\n", json);
+///     zx12_free_output(output);
+///   }
+export fn zx12_process_document(
+    x12_file_path: [*:0]const u8,
+    schema_path: [*:0]const u8,
+    output_ptr: *?*ZX12_Output,
+) c_int {
+    const allocator = getGlobalAllocator();
 
-    if (path_len == 0 or path_len >= 4096) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
+    // Convert C strings to Zig slices
+    const x12_path = std.mem.span(x12_file_path);
+    const schema_file = std.mem.span(schema_path);
 
-    // Open and read file
-    const file = std.fs.openFileAbsoluteZ(path, .{ .mode = .read_only }) catch {
-        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
+    // Open X12 file
+    const x12_file = std.fs.cwd().openFile(x12_path, .{}) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+    defer x12_file.close();
+
+    // Process document
+    var json_output = document_processor.processDocument(
+        allocator,
+        x12_file,
+        schema_file,
+    ) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+
+    // Get the data from ArrayList
+    const length = json_output.items.len;
+
+    // Allocate buffer with room for null terminator
+    const data = allocator.alloc(u8, length + 1) catch {
+        json_output.deinit(allocator);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    // Copy data and add null terminator
+    @memcpy(data[0..length], json_output.items);
+    data[length] = 0;
+
+    // Free the ArrayList
+    json_output.deinit(allocator);
+
+    // Create output handle
+    const handle = allocator.create(OutputHandle) catch {
+        allocator.free(data);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    handle.* = .{
+        .data = data,
+        .length = length,
+    };
+
+    output_ptr.* = @ptrCast(handle);
+    return @intFromEnum(ZX12_Error.Success);
+}
+
+// Internal structure to store output with length
+const OutputHandle = struct {
+    data: []u8,
+    length: usize,
+};
+
+/// Get the JSON string from the output handle
+///
+/// @param output Output handle from zx12_process_document
+/// @return Null-terminated JSON string, or NULL on error
+///
+/// The returned string is valid until zx12_free_output is called
+export fn zx12_get_output(output: *ZX12_Output) ?[*:0]const u8 {
+    const handle: *OutputHandle = @ptrCast(@alignCast(output));
+    // The data is already null-terminated from dupe
+    return @ptrCast(handle.data.ptr);
+}
+
+/// Get the length of the JSON output (excluding null terminator)
+///
+/// @param output Output handle from zx12_process_document
+/// @return Length of JSON string in bytes
+export fn zx12_get_output_length(output: *ZX12_Output) usize {
+    const handle: *OutputHandle = @ptrCast(@alignCast(output));
+    return handle.length;
+}
+
+/// Free the output handle and its associated memory
+///
+/// @param output Output handle from zx12_process_document
+export fn zx12_free_output(output: *ZX12_Output) void {
+    const allocator = getGlobalAllocator();
+    const handle: *OutputHandle = @ptrCast(@alignCast(output));
+    allocator.free(handle.data);
+    allocator.destroy(handle);
+}
+
+/// Process X12 document from memory buffer
+///
+/// @param x12_data Pointer to X12 data in memory
+/// @param x12_length Length of X12 data in bytes
+/// @param schema_path Path to schema JSON file (null-terminated C string)
+/// @param output_ptr Pointer to receive the output handle (must not be null)
+/// @return 0 on success, error code otherwise
+export fn zx12_process_from_memory(
+    x12_data: [*]const u8,
+    x12_length: usize,
+    schema_path: [*:0]const u8,
+    output_ptr: *?*ZX12_Output,
+) c_int {
+    // Write X12 data to temporary file
+    const temp_filename = "temp_zx12_input.x12";
+    const file = std.fs.cwd().createFile(temp_filename, .{}) catch |err| {
+        return @intFromEnum(errorToCode(err));
     };
     defer file.close();
+    defer std.fs.cwd().deleteFile(temp_filename) catch {};
 
-    const file_stat = file.stat() catch {
-        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
+    const x12_slice = x12_data[0..x12_length];
+    file.writeAll(x12_slice) catch |err| {
+        return @intFromEnum(errorToCode(err));
     };
 
-    if (file_stat.size == 0) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    // Read file contents
-    const buff = context.allocator.alloc(u8, file_stat.size) catch {
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
-    };
-    defer context.allocator.free(buff);
-
-    _ = file.readAll(buff) catch {
-        return @intFromEnum(ZX12_Error.FILE_NOT_FOUND);
-    };
-
-    // Parse schema
-    var schema = schema_parser.Schema.fromJson(context.allocator, buff) catch {
-        return @intFromEnum(ZX12_Error.PARSE_ERROR);
-    };
-
-    // Copy the schema name
-    const schema_name = context.allocator.alloc(u8, name_len) catch {
-        schema.deinit();
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
-    };
-    @memcpy(schema_name, name[0..name_len]);
-
-    // Store schema and name
-    context.schemas.put(schema_name, schema) catch {
-        context.allocator.free(schema_name);
-        schema.deinit();
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
-    };
-
-    context.schema_names.put(schema_name, schema_name) catch {
-        _ = context.schemas.swapRemove(schema_name);
-        context.allocator.free(schema_name);
-        schema.deinit();
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
-    };
-
-    return @intFromEnum(ZX12_Error.SUCCESS);
+    // Process using file-based function
+    return zx12_process_document(temp_filename, schema_path, output_ptr);
 }
 
-export fn zx12_parse_x12(
-    ctx: ?*ZX12_Context,
-    schema_name: [*c]const u8,
-    schema_name_len: usize,
-    x12_data: [*c]const u8,
-    x12_data_len: usize,
-    out_buffer_id: *isize,
-    out_length: *isize,
-) callconv(.c) c_int {
-    if (ctx == null or schema_name == null or x12_data == null) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    const context = ctx.?;
-
-    if (schema_name_len == 0 or x12_data_len == 0) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    // Get schema
-    const schema = context.schemas.getPtr(schema_name[0..schema_name_len]) orelse {
-        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
-    };
-
-    // Parse x12 data
-    var document = x12.X12Document.init(context.allocator);
-    defer document.deinit();
-
-    document.parse(x12_data[0..x12_data_len]) catch {
-        return @intFromEnum(ZX12_Error.PARSE_ERROR);
-    };
-
-    // Process with schema
-    var parsed = schema_parser.parseWithSchema(context.allocator, &document, schema) catch {
-        return @intFromEnum(ZX12_Error.PARSE_ERROR);
-    };
-    defer parsed.deinit();
-
-    // Convert to JSON
-    var writer = std.Io.Writer.Allocating.init(context.allocator);
-    defer writer.deinit();
-    std.json.Stringify.value(parsed.value, .{}, &writer.writer) catch {
-        return @intFromEnum(ZX12_Error.PARSE_ERROR);
-    };
-    const json_str = writer.written();
-
-    // Store in buffers map
-    const buffer_id = @intFromPtr(json_str.ptr);
-    context.buffers.put(buffer_id, json_str) catch {
-        context.allocator.free(json_str);
-        return @intFromEnum(ZX12_Error.MEMORY_ERROR);
-    };
-
-    // Return buffer info
-    out_buffer_id.* = @intCast(buffer_id);
-    out_length.* = @intCast(json_str.len);
-
-    return @intFromEnum(ZX12_Error.SUCCESS);
+/// Get the version string of the zX12 library
+///
+/// @return Null-terminated version string
+export fn zx12_get_version() [*:0]const u8 {
+    return "1.0.0";
 }
 
-export fn zx12_get_buffer_data(ctx: ?*ZX12_Context, buffer_id: usize, out_buffer: ?[*]u8, buffer_capacity: usize) callconv(.c) c_int {
-    if (ctx == null or out_buffer == null) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    const context = ctx.?;
-
-    // Get the buffer
-    const buffer = context.buffers.get(buffer_id) orelse {
-        return @intFromEnum(ZX12_Error.BUFFER_NOT_FOUND);
-    };
-
-    if (buffer.len > buffer_capacity) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    // Copy data to provided buffer
-    @memcpy(out_buffer.?[0..buffer.len], buffer);
-
-    return @intFromEnum(ZX12_Error.SUCCESS);
-}
-
-export fn zx12_free_buffer(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.c) c_int {
-    if (ctx == null) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    const context = ctx.?;
-
-    const buffer = context.buffers.get(buffer_id) orelse {
-        return @intFromEnum(ZX12_Error.BUFFER_NOT_FOUND);
-    };
-
-    context.allocator.free(buffer);
-    _ = context.buffers.swapRemove(buffer_id);
-    return @intFromEnum(ZX12_Error.SUCCESS);
-}
-
-export fn zx12_free_schema(ctx: ?*ZX12_Context, schema_name: [*c]const u8, schema_name_len: usize) callconv(.c) c_int {
-    if (ctx == null or schema_name == null) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    const context = ctx.?;
-
-    if (schema_name_len == 0) {
-        return @intFromEnum(ZX12_Error.INVALID_ARGUMENT);
-    }
-
-    const schema_key = schema_name[0..schema_name_len];
-    const schema = context.schemas.getPtr(schema_key) orelse {
-        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
-    };
-
-    // Free the schema
-    schema.deinit();
-
-    // Remove from maps
-    const name_ptr = context.schema_names.get(schema_key) orelse {
-        _ = context.schemas.swapRemove(schema_key);
-        return @intFromEnum(ZX12_Error.SCHEMA_NOT_FOUND);
-    };
-
-    context.allocator.free(name_ptr);
-    _ = context.schemas.swapRemove(schema_key);
-    _ = context.schema_names.swapRemove(schema_key);
-
-    return @intFromEnum(ZX12_Error.SUCCESS);
-}
-
-export fn zx12_get_error_message(error_code: c_int) callconv(.c) [*:0]const u8 {
-    const err = @as(ZX12_Error, @enumFromInt(error_code));
-    return switch (err) {
-        .SUCCESS => "Success",
-        .INVALID_ARGUMENT => "Invalid argument",
-        .FILE_NOT_FOUND => "File not found",
-        .MEMORY_ERROR => "Memory allocation error",
-        .PARSE_ERROR => "Parse error",
-        .SCHEMA_NOT_FOUND => "Schema not found",
-        .BUFFER_NOT_FOUND => "Buffer not found",
-        .UNKNOWN_ERROR => "Unknown error",
+/// Get error message for an error code
+///
+/// @param error_code Error code from zx12 function
+/// @return Null-terminated error message string
+export fn zx12_get_error_message(error_code: c_int) [*:0]const u8 {
+    const code: ZX12_Error = @enumFromInt(error_code);
+    return switch (code) {
+        .Success => "Success",
+        .OutOfMemory => "Out of memory",
+        .InvalidISA => "Invalid ISA segment (must be exactly 106 characters)",
+        .FileNotFound => "File not found",
+        .ParseError => "X12 parsing error",
+        .SchemaLoadError => "Schema loading error",
+        .UnknownHLLevel => "Unknown HL level code in schema",
+        .PathConflict => "JSON path conflict (trying to overwrite non-object with object)",
+        .InvalidArgument => "Invalid argument (library not initialized or null pointer)",
+        .UnknownError => "Unknown error",
     };
 }
 
-export fn zx12_get_buffer_size(ctx: ?*ZX12_Context, buffer_id: usize) callconv(.c) c_int {
-    if (ctx == null) {
-        return -1;
-    }
+// ============================================================================
+// Test the C API
+// ============================================================================
 
-    const context = ctx.?;
-    const buffer = context.buffers.get(buffer_id) orelse {
-        return -1;
-    };
-
-    return @intCast(buffer.len);
+test "C API initialization" {
+    const result = zx12_init();
+    try std.testing.expectEqual(@as(c_int, 0), result);
+    defer zx12_deinit();
 }
+
+test "C API version" {
+    const version = zx12_get_version();
+    const version_slice = std.mem.span(version);
+    try std.testing.expectEqualStrings("1.0.0", version_slice);
+}
+
+test "C API error messages" {
+    const msg = zx12_get_error_message(@intFromEnum(ZX12_Error.InvalidISA));
+    const msg_slice = std.mem.span(msg);
+    try std.testing.expect(msg_slice.len > 0);
+}
+
+// Note: The C API tests are skipped because they require linking with libc
+// For actual C API testing, compile with `-lc` flag:
+//   zig test src/main.zig -lc
+//
+// test "C API process document" {
+//     _ = zx12_init();
+//     defer zx12_deinit();
+//
+//     var output: ?*ZX12_Output = null;
+//     const result = zx12_process_document(
+//         "samples/837p_example.x12",
+//         "schema/837p.json",
+//         &output,
+//     );
+//
+//     try std.testing.expectEqual(@as(c_int, 0), result);
+//     try std.testing.expect(output != null);
+//
+//     if (output) |out| {
+//         const json_ptr = zx12_get_output(out);
+//         try std.testing.expect(json_ptr != null);
+//
+//         if (json_ptr) |json| {
+//             const json_slice = std.mem.span(json);
+//             try std.testing.expect(json_slice.len > 0);
+//             try std.testing.expect(std.mem.indexOf(u8, json_slice, "interchange") != null);
+//         }
+//
+//         zx12_free_output(out);
+//     }
+// }
+//
+// test "C API process from memory" {
+//     _ = zx12_init();
+//     defer zx12_deinit();
+//
+//     const x12_data = "ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *231016*1430*^*00501*000000001*0*P*:~" ++
+//         "GS*HC*SENDER*RECEIVER*20231016*1430*1*X*005010X222A1~" ++
+//         "ST*837*0001*005010X222A1~" ++
+//         "BHT*0019*00*123456*20231016*1430*CH~" ++
+//         "SE*4*0001~" ++
+//         "GE*1*1~" ++
+//         "IEA*1*000000001~";
+//
+//     var output: ?*ZX12_Output = null;
+//     const result = zx12_process_from_memory(
+//         x12_data.ptr,
+//         x12_data.len,
+//         "schema/837p.json",
+//         &output,
+//     );
+//
+//     try std.testing.expectEqual(@as(c_int, 0), result);
+//     try std.testing.expect(output != null);
+//
+//     if (output) |out| {
+//         const json_ptr = zx12_get_output(out);
+//         try std.testing.expect(json_ptr != null);
+//         zx12_free_output(out);
+//     }
+// }
+
+// ============================================================================
+// Example C Usage
+// ============================================================================
+
+// The following would be the C header file (zx12.h):
+//
+// #ifndef ZX12_H
+// #define ZX12_H
+//
+// #include <stddef.h>
+//
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
+//
+// // Opaque handle to output
+// typedef struct ZX12_Output ZX12_Output;
+//
+// // Error codes
+// typedef enum {
+//     ZX12_SUCCESS = 0,
+//     ZX12_OUT_OF_MEMORY = 1,
+//     ZX12_INVALID_ISA = 2,
+//     ZX12_FILE_NOT_FOUND = 3,
+//     ZX12_PARSE_ERROR = 4,
+//     ZX12_SCHEMA_LOAD_ERROR = 5,
+//     ZX12_UNKNOWN_HL_LEVEL = 6,
+//     ZX12_PATH_CONFLICT = 7,
+//     ZX12_INVALID_ARGUMENT = 8,
+//     ZX12_UNKNOWN_ERROR = 99
+// } ZX12_Error;
+//
+// // Initialize library
+// int zx12_init(void);
+//
+// // Cleanup library
+// void zx12_deinit(void);
+//
+// // Process X12 document from file
+// int zx12_process_document(
+//     const char* x12_file_path,
+//     const char* schema_path,
+//     ZX12_Output** output_ptr
+// );
+//
+// // Process X12 document from memory
+// int zx12_process_from_memory(
+//     const unsigned char* x12_data,
+//     size_t x12_length,
+//     const char* schema_path,
+//     ZX12_Output** output_ptr
+// );
+//
+// // Get JSON output string
+// const char* zx12_get_output(ZX12_Output* output);
+//
+// // Get JSON output length
+// size_t zx12_get_output_length(ZX12_Output* output);
+//
+// // Free output
+// void zx12_free_output(ZX12_Output* output);
+//
+// // Get library version
+// const char* zx12_get_version(void);
+//
+// // Get error message
+// const char* zx12_get_error_message(int error_code);
+//
+// #ifdef __cplusplus
+// }
+// #endif
+//
+// #endif // ZX12_H
+
+// Example C usage:
+//
+// #include "zx12.h"
+// #include <stdio.h>
+// #include <stdlib.h>
+//
+// int main(void) {
+//     // Initialize library
+//     if (zx12_init() != ZX12_SUCCESS) {
+//         fprintf(stderr, "Failed to initialize zX12\n");
+//         return 1;
+//     }
+//
+//     // Process document
+//     ZX12_Output* output = NULL;
+//     int result = zx12_process_document(
+//         "input.x12",
+//         "schema/837p.json",
+//         &output
+//     );
+//
+//     if (result != ZX12_SUCCESS) {
+//         fprintf(stderr, "Error: %s\n", zx12_get_error_message(result));
+//         zx12_deinit();
+//         return 1;
+//     }
+//
+//     // Get JSON output
+//     const char* json = zx12_get_output(output);
+//     size_t length = zx12_get_output_length(output);
+//
+//     printf("JSON output (%zu bytes):\n%s\n", length, json);
+//
+//     // Write to file
+//     FILE* f = fopen("output.json", "w");
+//     if (f) {
+//         fwrite(json, 1, length, f);
+//         fclose(f);
+//     }
+//
+//     // Cleanup
+//     zx12_free_output(output);
+//     zx12_deinit();
+//
+//     return 0;
+// }
