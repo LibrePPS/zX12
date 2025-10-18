@@ -173,14 +173,6 @@ This tokenizer strictly enforces the X12 standard:
 - **Lazy Parsing**: Composite/repetition parsing only when requested
 - **Minimal Allocations**: Only allocates for segment list and cleaned content
 
-## Next Steps
-
-This tokenizer provides the foundation for:
-1. **HL Tree Builder**: Use parsed segments to build hierarchy tree
-2. **Schema Loader**: Load v2.0 JSON schemas for validation
-3. **JSON Builder**: Convert parsed segments to JSON output
-4. **Document Processor**: Orchestrate full parsing pipeline
-
 ## Files
 
 - `x12_parser.zig`: Main tokenizer implementation (17 tests)
