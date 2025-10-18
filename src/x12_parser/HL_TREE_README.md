@@ -242,13 +242,6 @@ zig test src/x12_parser/hl_tree.zig
 zig run src/x12_parser/test_hl_tree.zig
 ```
 
-## Next Steps
-
-The HL tree builder provides the hierarchical structure needed for:
-1. **Schema Loader**: Load v2.0 schemas with direct HL level mapping
-2. **JSON Builder**: Create nested JSON matching HL hierarchy
-3. **Document Processor**: Process segments according to schema rules
-
 ## License
 
 Part of the zX12 project - X12 EDI parser for healthcare claims (837P/837I).
