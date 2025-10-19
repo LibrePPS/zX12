@@ -6,6 +6,9 @@ set -e
 echo "=== Building zX12 Library ==="
 echo ""
 
+#Make zig-out/bin if it doesn't exist
+mkdir -p zig-out/bin
+
 # Determine platform
 OS=$(uname -s)
 case "$OS" in
@@ -35,7 +38,7 @@ echo ""
 zig build-lib src/main.zig \
     -dynamic \
     -lc \
-    -femit-bin=libzx12.$EXT \
+    -femit-bin=./zig-out/bin/libzx12.$EXT \
     -O ReleaseFast
 
 echo "✅ Build successful: libzx12.$EXT"
@@ -46,24 +49,26 @@ echo "Building static library: libzx12.a"
 zig build-lib src/main.zig \
     -static \
     -lc \
-    -femit-bin=libzx12.a \
+    -femit-bin=./zig-out/bin/libzx12.a \
     -O ReleaseFast
 
 echo "✅ Build successful: libzx12.a"
 echo ""
 
-# Build C example
-if [ -f examples/c/example.c ]; then
-    echo "Building C example..."
-    gcc -o zx12_example \
-        examples/c/example.c \
-        -L. -lzx12 \
-        -I./include \
-        -Wl,-rpath,. \
-        -O2
-    
-    echo "✅ C example built: ./zx12_example"
-    echo ""
+# Build C example if --build-c-example
+if [ "$1" == "--build-c-example" ]; then
+    if [ -f examples/c/example.c ]; then
+        echo "Building C example..."
+        gcc -o zx12_example \
+            examples/c/example.c \
+            -L. -lzx12 \
+            -I./include \
+            -Wl,-rpath,. \
+            -O2
+
+        echo "✅ C example built: ./zx12_example"
+        echo ""
+    fi
 fi
 
 echo "=== Build Complete ==="
