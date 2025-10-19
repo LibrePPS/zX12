@@ -1,13 +1,10 @@
-# zX12 - A blazing fast X12 EDI Parser
+# zX12 - An X12 EDI Parser
 
-**zX12** is a high-performance, memory-safe, and thread-safe X12 EDI parser written in Zig. It is designed to parse complex X12 documents, such as healthcare claims (837P and 837I), and convert them into a structured JSON format based on a configurable schema.
+**zX12** is a performantX12 EDI parser written in Zig. It is designed to parse complex X12 documents, such as healthcare claims (837P and 837I), and convert them into a structured JSON format based on a configurable schema.
 
 This project provides a C-compatible library that can be easily integrated into various programming languages, including C, C++, Python, and more.
 
 ## Features
-
-- **High Performance:** Parses X12 documents at a high throughput, suitable for processing large volumes of data.
-- **Memory Safety:** Built with Zig, which provides compile-time checks to prevent common memory-related bugs.
 - **Thread-Safe:** Can be used in multi-threaded applications to process multiple documents concurrently.
 - **Schema-Driven:** Uses a flexible JSON schema to define the parsing logic, making it adaptable to different X12 transaction sets and versions.
 - **C API:** Provides a simple and stable C API for easy integration with other languages.
