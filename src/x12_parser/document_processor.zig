@@ -42,6 +42,10 @@ pub fn processDocument(
         schema_to_use = try schema_mod.loadSchema(parser_allocator, schema_path.?);
     }
 
+    // Collect boundary segments from schema
+    var boundary_segments = try schema_to_use.?.collectBoundarySegments(parser_allocator);
+    defer boundary_segments.deinit();
+
     // Build HL tree
     var tree = try hl_tree.buildTree(parser_allocator, document);
     defer tree.deinit();
@@ -52,7 +56,7 @@ pub fn processDocument(
 
     // Process sections
     try processHeader(&builder, &document, &schema_to_use.?, parser_allocator);
-    try processHierarchy(&builder, &tree, &document, &schema_to_use.?, parser_allocator);
+    try processHierarchy(&builder, &tree, &document, &schema_to_use.?, &boundary_segments, parser_allocator);
     try processTrailer(&builder, &document, &schema_to_use.?, parser_allocator);
 
     // Stringify JSON
@@ -87,11 +91,12 @@ fn processHierarchy(
     tree: *const HLTree,
     document: *const X12Document,
     schema: *const Schema,
+    boundary_segments: *const std.StringHashMap(void),
     allocator: std.mem.Allocator,
 ) !void {
     // Process each root node
     for (tree.roots) |*root| {
-        try processHLNode(builder, root, tree, document, schema, schema.hierarchical_output_array, allocator);
+        try processHLNode(builder, root, tree, document, schema, boundary_segments, schema.hierarchical_output_array, allocator);
     }
 }
 
@@ -102,6 +107,7 @@ fn processHLNode(
     _: *const HLTree,
     document: *const X12Document,
     schema: *const Schema,
+    boundary_segments: *const std.StringHashMap(void),
     parent_array_path: []const u8,
     allocator: std.mem.Allocator,
 ) !void {
@@ -145,7 +151,7 @@ fn processHLNode(
                     var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
                     defer dummy_processed.deinit();
                     // Process segment into node object
-                    try processSegmentIntoObject(node_obj, segment, &seg_def, segments, seg_idx, allocator, &dummy_processed);
+                    try processSegmentIntoObject(node_obj, segment, &seg_def, segments, seg_idx, boundary_segments, allocator, &dummy_processed);
                     seg_idx += 1;
                     break;
                 }
@@ -159,7 +165,7 @@ fn processHLNode(
     defer processed_segments.deinit();
 
     for (level.non_hierarchical_loops) |loop| {
-        _ = try processNonHierarchicalLoop(node_obj, &loop, segments, seg_idx, segments.len, document, allocator, &processed_segments);
+        _ = try processNonHierarchicalLoop(node_obj, &loop, segments, seg_idx, segments.len, document, boundary_segments, allocator, &processed_segments);
     }
 
     // Add node to parent array
@@ -207,7 +213,7 @@ fn processHLNode(
                             if (matches) {
                                 var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
                                 defer dummy_processed.deinit();
-                                try processSegmentIntoObject(child_obj, segment, &seg_def, child_segments, search_idx, allocator, &dummy_processed);
+                                try processSegmentIntoObject(child_obj, segment, &seg_def, child_segments, search_idx, boundary_segments, allocator, &dummy_processed);
                                 child_seg_idx = search_idx + 1;
                                 break;
                             }
@@ -219,7 +225,7 @@ fn processHLNode(
                 for (child_level.non_hierarchical_loops) |loop| {
                     var child_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
                     defer child_processed.deinit();
-                    _ = try processNonHierarchicalLoop(child_obj, &loop, child_segments, child_seg_idx, child_segments.len, document, allocator, &child_processed);
+                    _ = try processNonHierarchicalLoop(child_obj, &loop, child_segments, child_seg_idx, child_segments.len, document, boundary_segments, allocator, &child_processed);
                 }
 
                 // Add child array to parent object if it doesn't exist
@@ -284,7 +290,7 @@ fn processHLNode(
                                         if (matches) {
                                             var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
                                             defer dummy_processed.deinit();
-                                            try processSegmentIntoObject(grandchild_obj, segment, &seg_def, grandchild_segments, search_idx, allocator, &dummy_processed);
+                                            try processSegmentIntoObject(grandchild_obj, segment, &seg_def, grandchild_segments, search_idx, boundary_segments, allocator, &dummy_processed);
                                             grandchild_seg_idx = search_idx + 1;
                                             break;
                                         }
@@ -296,7 +302,7 @@ fn processHLNode(
                             for (grandchild_level.non_hierarchical_loops) |loop| {
                                 var grandchild_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
                                 defer grandchild_processed.deinit();
-                                _ = try processNonHierarchicalLoop(grandchild_obj, &loop, grandchild_segments, grandchild_seg_idx, grandchild_segments.len, document, allocator, &grandchild_processed);
+                                _ = try processNonHierarchicalLoop(grandchild_obj, &loop, grandchild_segments, grandchild_seg_idx, grandchild_segments.len, document, boundary_segments, allocator, &grandchild_processed);
                             }
 
                             // Add grandchild array to child object if it doesn't exist
@@ -329,6 +335,7 @@ fn processNonHierarchicalLoop(
     start_idx: usize,
     end_idx: usize,
     document: *const X12Document,
+    boundary_segments: *const std.StringHashMap(void),
     allocator: std.mem.Allocator,
     processed_segments: *std.AutoHashMap(*const x12_parser.Segment, void),
 ) !usize {
@@ -444,7 +451,7 @@ fn processNonHierarchicalLoop(
 
                         if (matches) {
                             // Process segment into loop object
-                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, allocator, processed_segments);
+                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, boundary_segments, allocator, processed_segments);
                             found_any = true;
 
                             // Mark this segment as processed
@@ -505,18 +512,18 @@ fn processNonHierarchicalLoop(
                             break;
                         }
                     }
-                }
 
-                const nested_max = try processNonHierarchicalLoop(&loop_obj, &nested_loop, segments, seg_idx, this_nested_end, document, allocator, processed_segments);
-                std.log.debug("Nested loop '{s}' returned max index: {d}, current max_idx: {d}", .{ nested_loop.name, nested_max, max_idx });
-                // Update max_idx to account for segments processed by nested loops
-                if (nested_max > max_idx) {
-                    std.log.debug("Updating max_idx from {d} to {d} based on nested loop", .{ max_idx, nested_max });
-                    max_idx = nested_max;
-                }
-                // Also update overall max
-                if (max_idx > overall_max_idx) {
-                    overall_max_idx = max_idx;
+                    const nested_max_idx = try processNonHierarchicalLoop(&loop_obj, &nested_loop, segments, loop_start, this_nested_end, document, boundary_segments, allocator, processed_segments);
+                    std.log.debug("Nested loop '{s}' returned max index: {d}, current max_idx: {d}", .{ nested_loop.name, nested_max_idx, max_idx });
+                    // Update max_idx to account for segments processed by nested loops
+                    if (nested_max_idx > max_idx) {
+                        std.log.debug("Updating max_idx from {d} to {d} based on nested loop", .{ max_idx, nested_max_idx });
+                        max_idx = nested_max_idx;
+                    }
+                    // Also update overall max
+                    if (max_idx > overall_max_idx) {
+                        overall_max_idx = max_idx;
+                    }
                 }
             }
 
@@ -574,7 +581,7 @@ fn processNonHierarchicalLoop(
 
                         if (matches) {
                             // Process segment into loop object
-                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, allocator, processed_segments);
+                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, boundary_segments, allocator, processed_segments);
                             found_any = true;
 
                             // Mark this segment as processed
@@ -761,6 +768,7 @@ fn processSegmentIntoObject(
     seg_def: *const schema_mod.SegmentDef,
     segments: []const x12_parser.Segment,
     segment_idx: usize,
+    boundary_segments: *const std.StringHashMap(void),
     allocator: std.mem.Allocator,
     processed_segments: *std.AutoHashMap(*const x12_parser.Segment, void),
 ) !void {
@@ -922,13 +930,9 @@ fn processSegmentIntoObject(
             while (current_search < segments.len) : (current_search += 1) {
                 const group_segment = &segments[current_search];
 
-                // Stop searching if we hit a structural segment that indicates the group has ended
-                // Don't stop on the trigger segment itself as we're looking within the group
-                if (std.mem.eql(u8, group_segment.id, "HL") or
-                    std.mem.eql(u8, group_segment.id, "CLM") or
-                    std.mem.eql(u8, group_segment.id, "SBR") or
-                    std.mem.eql(u8, group_segment.id, "LX"))
-                {
+                // Stop searching if we hit a boundary segment (loop trigger or structural segment)
+                // These indicate the group has ended
+                if (boundary_segments.contains(group_segment.id)) {
                     break;
                 }
 

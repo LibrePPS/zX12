@@ -232,6 +232,52 @@ pub const Schema = struct {
         }
         return null;
     }
+
+    /// Collect all boundary segments (loop triggers and structural segments).
+    /// These are segments that should terminate group searching when processing segment groups.
+    ///
+    /// Boundary segments include:
+    /// - "HL" - Always a boundary (hierarchical level segments)
+    /// - Loop triggers from sequential sections
+    /// - Loop triggers from all non-hierarchical loops (including nested loops)
+    ///
+    /// When processing a segment group (e.g., NM1+N3+N4+REF), the parser will stop
+    /// searching for group members if it encounters a boundary segment, as this indicates
+    /// the start of a new structural section or loop.
+    ///
+    /// Returns a StringHashMap with segment IDs as keys. Use `.contains(segment_id)` to check
+    /// if a segment is a boundary.
+    pub fn collectBoundarySegments(self: *const Schema, allocator: std.mem.Allocator) !std.StringHashMap(void) {
+        var boundaries = std.StringHashMap(void).init(allocator);
+        errdefer boundaries.deinit();
+
+        // Always include HL as a boundary
+        try boundaries.put("HL", {});
+
+        // Add triggers from all hierarchical levels
+        var level_iter = self.hl_levels.valueIterator();
+        while (level_iter.next()) |level| {
+            // Add triggers from non-hierarchical loops at this level
+            for (level.non_hierarchical_loops) |loop| {
+                try boundaries.put(loop.trigger, {});
+
+                // Add triggers from nested loops
+                try addNestedLoopTriggers(&boundaries, loop.nested_loops);
+            }
+        }
+
+        return boundaries;
+    }
+
+    /// Helper to recursively add nested loop triggers
+    fn addNestedLoopTriggers(boundaries: *std.StringHashMap(void), nested_loops: []const NonHierarchicalLoop) !void {
+        for (nested_loops) |loop| {
+            try boundaries.put(loop.trigger, {});
+            if (loop.nested_loops.len > 0) {
+                try addNestedLoopTriggers(boundaries, loop.nested_loops);
+            }
+        }
+    }
 };
 
 /// Load schema from JSON file
@@ -764,11 +810,61 @@ test "check value mappings" {
 
 test "load 837I schema" {
     const allocator = testing.allocator;
-
     var schema = try loadSchema(allocator, "schema/837i.json");
     defer schema.deinit();
 
-    try testing.expectEqualStrings("2.0", schema.version);
     try testing.expectEqualStrings("837I", schema.transaction_id);
     try testing.expectEqualStrings("005010X223A2", schema.transaction_version);
+    try testing.expectEqualStrings("837", schema.transaction_type);
+}
+
+test "collect boundary segments from schema" {
+    const allocator = testing.allocator;
+    var schema = try loadSchema(allocator, "schema/837i.json");
+    defer schema.deinit();
+
+    var boundaries = try schema.collectBoundarySegments(allocator);
+    defer boundaries.deinit();
+
+    // HL is always a boundary
+    try testing.expect(boundaries.contains("HL"));
+
+    // Non-hierarchical loop triggers
+    try testing.expect(boundaries.contains("CLM"));
+    try testing.expect(boundaries.contains("LX"));
+
+    // Nested loop triggers
+    try testing.expect(boundaries.contains("LIN"));
+    try testing.expect(boundaries.contains("SVD"));
+
+    // Should not contain regular segments (these are used within groups)
+    try testing.expect(!boundaries.contains("DTP"));
+    try testing.expect(!boundaries.contains("N3"));
+    try testing.expect(!boundaries.contains("N4"));
+    try testing.expect(!boundaries.contains("REF"));
+    try testing.expect(!boundaries.contains("HI"));
+}
+
+test "collect boundary segments from 837P schema" {
+    const allocator = testing.allocator;
+    var schema = try loadSchema(allocator, "schema/837p.json");
+    defer schema.deinit();
+
+    var boundaries = try schema.collectBoundarySegments(allocator);
+    defer boundaries.deinit();
+
+    // HL is always a boundary
+    try testing.expect(boundaries.contains("HL"));
+
+    // Non-hierarchical loop triggers from 837P
+    try testing.expect(boundaries.contains("CLM"));
+
+    // 837P has service line loops
+    try testing.expect(boundaries.contains("LX"));
+
+    // Should not contain regular segments (these are used within groups)
+    try testing.expect(!boundaries.contains("HI"));
+    try testing.expect(!boundaries.contains("REF"));
+    try testing.expect(!boundaries.contains("NM1"));
+    try testing.expect(!boundaries.contains("DTP"));
 }
