@@ -1,0 +1,28 @@
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zx12"
+version = "0.1.0"
+license = "MIT"
+authors = [
+  { name="Jacob Wilson", email="jjw07006@gmail.com" },
+  { name="Josh Lankford", email="lankford.josh@gmail.com" }
+]
+description = "A Python wrapper for the zX12 library."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "psutil>=7.1.1",
+    "setuptools>=68.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/LibrePPS/zX12"
+"Bug Tracker" = "https://github.com/LibrePPS/zX12/issues"

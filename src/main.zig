@@ -1,12 +1,14 @@
 const std = @import("std");
 const document_processor = @import("x12_parser/document_processor.zig");
-
+const schema_load = @import("x12_parser/schema.zig").loadSchema;
+const Schema = @import("x12_parser/schema.zig").Schema;
 // ============================================================================
 // C API for X12 Document Processing
 // ============================================================================
 
 /// Opaque handle to processed JSON output
 pub const ZX12_Output = opaque {};
+pub const ZX12_Schema = opaque {};
 
 /// Error codes returned by C API functions
 pub const ZX12_Error = enum(c_int) {
@@ -38,12 +40,7 @@ fn errorToCode(err: anyerror) ZX12_Error {
 
 /// Global allocator for C API (uses C allocator for simplicity and thread-safety)
 fn getGlobalAllocator() std.mem.Allocator {
-    // Use c_allocator when linking with libc, otherwise use page_allocator for tests
-    if (@import("builtin").link_libc) {
-        return std.heap.c_allocator;
-    } else {
-        return std.heap.page_allocator;
-    }
+    return std.heap.page_allocator;
 }
 
 /// Initialize the zX12 library
@@ -97,6 +94,86 @@ export fn zx12_process_document(
         allocator,
         x12_file,
         schema_file,
+        null,
+    ) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+
+    // Get the data from ArrayList
+    const length = json_output.items.len;
+
+    // Allocate buffer with room for null terminator
+    const data = allocator.alloc(u8, length + 1) catch {
+        json_output.deinit(allocator);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    // Copy data and add null terminator
+    @memcpy(data[0..length], json_output.items);
+    data[length] = 0;
+
+    // Free the ArrayList
+    json_output.deinit(allocator);
+
+    // Create output handle
+    const handle = allocator.create(OutputHandle) catch {
+        allocator.free(data);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    handle.* = .{
+        .data = data,
+        .length = length,
+    };
+
+    output_ptr.* = @ptrCast(handle);
+    return @intFromEnum(ZX12_Error.Success);
+}
+
+/// Process an X12 document with a pre-loaded schema
+///
+/// @param x12_file_path Path to the X12 file to process (null-terminated C string)
+/// @param schema Pre-loaded schema handle from zx12_load_schema
+/// @param output_ptr Pointer to receive the output handle (must not be null)
+/// @return 0 on success, error code otherwise
+///
+/// Example:
+///   ZX12_Schema* schema = NULL;
+///   zx12_load_schema("schema/837p.json", &schema);
+///
+///   ZX12_Output* output = NULL;
+///   int result = zx12_process_document_with_schema("input.x12", schema, &output);
+///   if (result == 0) {
+///     const char* json = zx12_get_output(output);
+///     printf("%s\n", json);
+///     zx12_free_output(output);
+///   }
+///   zx12_free_schema(schema);
+export fn zx12_process_document_with_schema(
+    x12_file_path: [*:0]const u8,
+    schema: *ZX12_Schema,
+    output_ptr: *?*ZX12_Output,
+) c_int {
+    const allocator = getGlobalAllocator();
+
+    // Convert C string to Zig slice
+    const x12_path = std.mem.span(x12_file_path);
+
+    // Extract schema from handle
+    const schema_handle: *SchemaHandle = @ptrCast(@alignCast(schema));
+
+    // Open X12 file
+    const x12_file = std.fs.cwd().openFile(x12_path, .{}) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+    defer x12_file.close();
+
+    // Process document with pre-loaded schema
+    var json_output = document_processor.processDocument(
+        allocator,
+        x12_file,
+        null, // schema_file not needed since we're passing the schema
+        schema_handle.schema,
     ) catch |err| {
         return @intFromEnum(errorToCode(err));
     };
@@ -136,6 +213,11 @@ export fn zx12_process_document(
 const OutputHandle = struct {
     data: []u8,
     length: usize,
+};
+
+// Internal structure to store schema
+const SchemaHandle = struct {
+    schema: Schema,
 };
 
 /// Get the JSON string from the output handle
@@ -199,6 +281,50 @@ export fn zx12_process_from_memory(
     return zx12_process_document(temp_filename, schema_path, output_ptr);
 }
 
+/// Process X12 document from memory buffer with a pre-loaded schema
+///
+/// @param x12_data Pointer to X12 data in memory
+/// @param x12_length Length of X12 data in bytes
+/// @param schema Pre-loaded schema handle from zx12_load_schema
+/// @param output_ptr Pointer to receive the output handle (must not be null)
+/// @return 0 on success, error code otherwise
+///
+/// Example:
+///   ZX12_Schema* schema = NULL;
+///   zx12_load_schema("schema/837p.json", &schema);
+///
+///   const char* x12_data = "ISA*00*...";
+///   ZX12_Output* output = NULL;
+///   int result = zx12_process_from_memory_with_schema(x12_data, strlen(x12_data), schema, &output);
+///   if (result == 0) {
+///     const char* json = zx12_get_output(output);
+///     printf("%s\n", json);
+///     zx12_free_output(output);
+///   }
+///   zx12_free_schema(schema);
+export fn zx12_process_from_memory_with_schema(
+    x12_data: [*]const u8,
+    x12_length: usize,
+    schema: *ZX12_Schema,
+    output_ptr: *?*ZX12_Output,
+) c_int {
+    // Write X12 data to temporary file
+    const temp_filename = "temp_zx12_input.x12";
+    const file = std.fs.cwd().createFile(temp_filename, .{}) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+    defer file.close();
+    defer std.fs.cwd().deleteFile(temp_filename) catch {};
+
+    const x12_slice = x12_data[0..x12_length];
+    file.writeAll(x12_slice) catch |err| {
+        return @intFromEnum(errorToCode(err));
+    };
+
+    // Process using file-based function with schema
+    return zx12_process_document_with_schema(temp_filename, schema, output_ptr);
+}
+
 /// Get the version string of the zX12 library
 ///
 /// @return Null-terminated version string
@@ -226,6 +352,55 @@ export fn zx12_get_error_message(error_code: c_int) [*:0]const u8 {
     };
 }
 
+/// Load an X12 schema from a JSON file
+///
+/// @param file_path Path to the schema JSON file (null-terminated C string)
+/// @param schema_ptr Pointer to receive the schema handle (must not be null)
+/// @return 0 on success, error code otherwise
+///
+/// Example:
+///   ZX12_Schema* schema = NULL;
+///   int result = zx12_load_schema("schema/837p.json", &schema);
+///   if (result == 0) {
+///     // Use schema...
+///     zx12_free_schema(schema);
+///   }
+export fn zx12_load_schema(
+    file_path: [*:0]const u8,
+    schema_ptr: *?*ZX12_Schema,
+) c_int {
+    const allocator = getGlobalAllocator();
+
+    // Load the schema
+    const schema = schema_load(allocator, std.mem.span(file_path)) catch |err| {
+        std.log.err("Error loading schema: {}", .{err});
+        return @intFromEnum(errorToCode(err));
+    };
+
+    // Create schema handle
+    const handle = allocator.create(SchemaHandle) catch {
+        // If we can't allocate the handle, we need to deinit the schema
+        var s = schema;
+        s.deinit();
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    handle.* = .{ .schema = schema };
+    schema_ptr.* = @ptrCast(handle);
+
+    return @intFromEnum(ZX12_Error.Success);
+}
+
+/// Free the schema handle and its associated memory
+///
+/// @param schema Schema handle from zx12_load_schema
+export fn zx12_free_schema(schema: *ZX12_Schema) void {
+    const allocator = getGlobalAllocator();
+    const handle: *SchemaHandle = @ptrCast(@alignCast(schema));
+    handle.schema.deinit();
+    allocator.destroy(handle);
+}
+
 // ============================================================================
 // Test the C API
 // ============================================================================
@@ -246,6 +421,58 @@ test "C API error messages" {
     const msg = zx12_get_error_message(@intFromEnum(ZX12_Error.InvalidISA));
     const msg_slice = std.mem.span(msg);
     try std.testing.expect(msg_slice.len > 0);
+}
+
+pub fn main() !void {
+    const allocator = std.heap.c_allocator;
+    // Load schema
+    const schema_path = "schema/837i.json";
+    var schema = schema_load(allocator, schema_path) catch |err| {
+        std.debug.print("Failed to load schema: {}\n", .{err});
+        return err;
+    };
+    defer schema.deinit();
+
+    // Open and process document
+    const file_path = "samples/837i_example.x12";
+    const file = std.fs.cwd().openFile(file_path, .{}) catch |err| {
+        std.debug.print("Failed to open file: {}\n", .{err});
+        return err;
+    };
+    defer file.close();
+
+    std.debug.print("\n=== Processing 837i sample to debug segment tracking ===\n", .{});
+    var result = document_processor.processDocument(allocator, file, null, schema) catch |err| {
+        std.debug.print("Failed to process document: {}\n", .{err});
+        return err;
+    };
+    defer result.deinit(allocator);
+
+    // Check if output contains duplicate location_number
+    const output = result.items;
+    const location_count = blk: {
+        var count: usize = 0;
+        var search_start: usize = 0;
+        while (std.mem.indexOfPos(u8, output, search_start, "\"location_number\"")) |pos| {
+            count += 1;
+            search_start = pos + 1;
+        }
+        break :blk count;
+    };
+
+    std.debug.print("Found {} occurrences of 'location_number' in output\n", .{location_count});
+
+    // Write output for inspection
+    const output_file = std.fs.cwd().createFile("test_output.json", .{}) catch |err| {
+        std.debug.print("Warning: Could not write output file: {}\n", .{err});
+        return; // Don't fail the test for this
+    };
+    defer output_file.close();
+    output_file.writeAll(output) catch |err| {
+        std.debug.print("Warning: Could not write to output file: {}\n", .{err});
+    };
+
+    std.debug.print("Output written to test_output.json\n", .{});
 }
 
 // Note: The C API tests are skipped because they require linking with libc
@@ -363,6 +590,21 @@ test "C API error messages" {
 //     ZX12_Output** output_ptr
 // );
 //
+// // Process X12 document from file with pre-loaded schema
+// int zx12_process_document_with_schema(
+//     const char* x12_file_path,
+//     ZX12_Schema* schema,
+//     ZX12_Output** output_ptr
+// );
+//
+// // Process X12 document from memory with pre-loaded schema
+// int zx12_process_from_memory_with_schema(
+//     const unsigned char* x12_data,
+//     size_t x12_length,
+//     ZX12_Schema* schema,
+//     ZX12_Output** output_ptr
+// );
+//
 // // Get JSON output string
 // const char* zx12_get_output(ZX12_Output* output);
 //
@@ -377,6 +619,15 @@ test "C API error messages" {
 //
 // // Get error message
 // const char* zx12_get_error_message(int error_code);
+//
+// // Load schema from file
+// int zx12_load_schema(
+//     const char* file_path,
+//     ZX12_Schema** schema_ptr
+// );
+//
+// // Free schema
+// void zx12_free_schema(ZX12_Schema* schema);
 //
 // #ifdef __cplusplus
 // }
@@ -426,6 +677,53 @@ test "C API error messages" {
 //
 //     // Cleanup
 //     zx12_free_output(output);
+//     zx12_deinit();
+//
+//     return 0;
+// }
+
+// Example C usage with pre-loaded schema (for processing multiple documents):
+//
+// #include "zx12.h"
+// #include <stdio.h>
+// #include <stdlib.h>
+//
+// int main(void) {
+//     // Initialize library
+//     if (zx12_init() != ZX12_SUCCESS) {
+//         fprintf(stderr, "Failed to initialize zX12\n");
+//         return 1;
+//     }
+//
+//     // Load schema once
+//     ZX12_Schema* schema = NULL;
+//     int result = zx12_load_schema("schema/837p.json", &schema);
+//     if (result != ZX12_SUCCESS) {
+//         fprintf(stderr, "Error loading schema: %s\n", zx12_get_error_message(result));
+//         zx12_deinit();
+//         return 1;
+//     }
+//
+//     // Process multiple documents with the same schema
+//     const char* files[] = {"input1.x12", "input2.x12", "input3.x12"};
+//     for (int i = 0; i < 3; i++) {
+//         ZX12_Output* output = NULL;
+//         result = zx12_process_document_with_schema(files[i], schema, &output);
+//
+//         if (result != ZX12_SUCCESS) {
+//             fprintf(stderr, "Error processing %s: %s\n",
+//                     files[i], zx12_get_error_message(result));
+//             continue;
+//         }
+//
+//         const char* json = zx12_get_output(output);
+//         printf("Processed %s: %zu bytes\n", files[i], zx12_get_output_length(output));
+//
+//         zx12_free_output(output);
+//     }
+//
+//     // Cleanup
+//     zx12_free_schema(schema);
 //     zx12_deinit();
 //
 //     return 0;
