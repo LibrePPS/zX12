@@ -514,7 +514,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Authors
 
 - Jacob Wilson - [jjw07006@gmail.com](mailto:jjw07006@gmail.com)
-- Josh Lankford - [josh.lank@gmail.com](mailto:josh.lank@gmail.com)
+- Josh Lankford - [lankford.josh@gmail.com](mailto:lankford.josh@gmail.com)
 
 ## Acknowledgments
 
