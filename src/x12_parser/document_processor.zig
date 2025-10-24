@@ -948,49 +948,41 @@ fn processSegmentIntoObject(
                     // Mark this segment as processed so parent loop doesn't process it again
                     try processed_segments.put(group_segment, {});
 
-                    // Check if this segment type can appear multiple times by looking for qualifier mapping
-                    // Only apply this for segments that typically appear multiple times (REF, DTP, etc.)
+                    // Check if this segment has qualifier mapping defined in schema
+                    // If position 0 has a map, use it to create nested objects based on qualifier value
                     var group_target_obj = target_obj;
                     var group_qualifier_key: ?[]const u8 = null;
 
-                    // Check if this is a segment type that can appear multiple times
-                    const is_multiple_segment = std.mem.eql(u8, group_seg_id, "REF") or
-                        std.mem.eql(u8, group_seg_id, "DTP") or
-                        std.mem.eql(u8, group_seg_id, "NTE") or
-                        std.mem.eql(u8, group_seg_id, "PER");
-
-                    if (is_multiple_segment) {
-                        // Find the first element for this segment that might have a qualifier map
-                        for (seg_def.elements) |elem_def| {
-                            if (elem_def.seg) |seg_id| {
-                                if (std.mem.eql(u8, seg_id, group_seg_id) and elem_def.pos == 0) {
-                                    // Get qualifier value and check for mapping
-                                    if (group_segment.getElement(1)) |qualifier_value| {
-                                        var key_to_use: []const u8 = qualifier_value;
-                                        if (elem_def.map) |map| {
-                                            if (map.get(qualifier_value)) |mapped_key| {
-                                                key_to_use = mapped_key;
-                                            }
-                                        }
-
-                                        // Allocate if using raw qualifier
-                                        if (key_to_use.ptr == qualifier_value.ptr) {
-                                            key_to_use = try allocator.dupe(u8, qualifier_value);
-                                        }
-                                        group_qualifier_key = key_to_use;
-
-                                        // Create or get nested object for this qualifier
-                                        if (target_obj.get(key_to_use)) |existing| {
-                                            group_target_obj = existing.object;
-                                        } else {
-                                            const nested_obj_ptr = try allocator.create(JsonObject);
-                                            nested_obj_ptr.* = JsonObject.init(allocator);
-                                            try target_obj.put(key_to_use, JsonValue{ .object = nested_obj_ptr });
-                                            group_target_obj = nested_obj_ptr;
+                    // Look for qualifier mapping at position 0 in the schema
+                    for (seg_def.elements) |elem_def| {
+                        if (elem_def.seg) |seg_id| {
+                            if (std.mem.eql(u8, seg_id, group_seg_id) and elem_def.pos == 0 and elem_def.map != null) {
+                                // This segment has a qualifier map - use it for nesting
+                                if (group_segment.getElement(1)) |qualifier_value| {
+                                    var key_to_use: []const u8 = qualifier_value;
+                                    if (elem_def.map) |map| {
+                                        if (map.get(qualifier_value)) |mapped_key| {
+                                            key_to_use = mapped_key;
                                         }
                                     }
-                                    break;
+
+                                    // Allocate if using raw qualifier
+                                    if (key_to_use.ptr == qualifier_value.ptr) {
+                                        key_to_use = try allocator.dupe(u8, qualifier_value);
+                                    }
+                                    group_qualifier_key = key_to_use;
+
+                                    // Create or get nested object for this qualifier
+                                    if (target_obj.get(key_to_use)) |existing| {
+                                        group_target_obj = existing.object;
+                                    } else {
+                                        const nested_obj_ptr = try allocator.create(JsonObject);
+                                        nested_obj_ptr.* = JsonObject.init(allocator);
+                                        try target_obj.put(key_to_use, JsonValue{ .object = nested_obj_ptr });
+                                        group_target_obj = nested_obj_ptr;
+                                    }
                                 }
+                                break;
                             }
                         }
                     }
