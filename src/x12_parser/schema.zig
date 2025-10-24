@@ -516,7 +516,7 @@ fn parseElement(allocator: std.mem.Allocator, elem_obj: std.json.ObjectMap) !Ele
         .integer => |i| @as(usize, @intCast(i)),
         else => 0,
     };
-    const path = elem_obj.get("path").?.string;
+    const path = if (elem_obj.get("path") != null) elem_obj.get("path").?.string else "";
     const expect = if (elem_obj.get("expect")) |e| e.string else null;
     const optional = if (elem_obj.get("optional")) |o| o.bool else false;
 

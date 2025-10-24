@@ -18,7 +18,8 @@ const JsonArray = json_builder.JsonArray;
 pub fn processDocument(
     allocator: std.mem.Allocator,
     x12_file_path: std.fs.File,
-    schema_path: []const u8,
+    schema_path: ?[]const u8,
+    schema: ?Schema,
 ) !std.ArrayList(u8) {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
@@ -31,9 +32,15 @@ pub fn processDocument(
     var document = try x12_parser.parse(parser_allocator, x12_content);
     defer document.deinit();
 
+    if (schema == null and schema_path == null) {
+        return std.json.Error.UnexpectedEndOfInput;
+    }
+
+    var schema_to_use: ?Schema = schema;
     // Load schema
-    var schema = try schema_mod.loadSchema(parser_allocator, schema_path);
-    defer schema.deinit();
+    if (schema_to_use == null) {
+        schema_to_use = try schema_mod.loadSchema(parser_allocator, schema_path.?);
+    }
 
     // Build HL tree
     var tree = try hl_tree.buildTree(parser_allocator, document);
@@ -44,15 +51,18 @@ pub fn processDocument(
     defer builder.deinit();
 
     // Process sections
-    try processHeader(&builder, &document, &schema, parser_allocator);
-    try processSequentialSections(&builder, &document, &schema, parser_allocator);
-    try processHierarchy(&builder, &tree, &document, &schema, parser_allocator);
-    try processTrailer(&builder, &document, &schema, parser_allocator);
+    try processHeader(&builder, &document, &schema_to_use.?, parser_allocator);
+    try processHierarchy(&builder, &tree, &document, &schema_to_use.?, parser_allocator);
+    try processTrailer(&builder, &document, &schema_to_use.?, parser_allocator);
 
     // Stringify JSON
     var output = std.ArrayList(u8){};
     try builder.stringify(&output, allocator); //<--Use the callers allocator here so they own memorys
 
+    if (schema == null) {
+        // Only deinit schema if it was loaded by this function
+        schema_to_use.?.deinit();
+    }
     return output;
 }
 
@@ -71,66 +81,6 @@ fn processHeader(
 }
 
 /// Process sequential (non-hierarchical) sections
-fn processSequentialSections(
-    builder: *JsonBuilder,
-    document: *const X12Document,
-    schema: *const Schema,
-    allocator: std.mem.Allocator,
-) !void {
-    _ = builder;
-    _ = document;
-    _ = allocator;
-    for (schema.sequential_sections) |section| {
-        // Find start of section by trigger segment (implementation placeholder)
-        _ = section;
-    }
-}
-
-/// Process a single section (group of segments)
-fn processSection(
-    builder: *JsonBuilder,
-    path_prefix: []const u8,
-    document: *const X12Document,
-    segment_defs: []const schema_mod.SegmentDef,
-    start_idx: usize,
-    allocator: std.mem.Allocator,
-) !void {
-    var seg_idx = start_idx;
-
-    for (segment_defs) |seg_def| {
-        // Find next matching segment
-        while (seg_idx < document.segments.len) : (seg_idx += 1) {
-            const segment = &document.segments[seg_idx];
-
-            if (std.mem.eql(u8, segment.id, seg_def.id)) {
-                // Check qualifier if specified
-                var matches = true;
-                if (seg_def.qualifier) |qual| {
-                    if (qual.len >= 2) {
-                        const pos = try std.fmt.parseInt(usize, qual[0], 10);
-                        const expected = qual[1];
-                        // Add 1 to pos to skip segment ID at position 0
-                        if (segment.getElement(pos + 1)) |elem| {
-                            if (!std.mem.eql(u8, elem, expected)) {
-                                matches = false;
-                            }
-                        } else {
-                            matches = false;
-                        }
-                    }
-                }
-
-                if (matches) {
-                    // Process this segment with path prefix
-                    try processSegmentWithPrefix(builder, segment, &seg_def, document, path_prefix, allocator);
-                    seg_idx += 1;
-                    break;
-                }
-            }
-        }
-    }
-}
-
 /// Process hierarchical structure (HL segments and their children)
 fn processHierarchy(
     builder: *JsonBuilder,
@@ -164,6 +114,7 @@ fn processHLNode(
 
     // Process segments for this HL level
     const segments = node.getSegments(document.*) orelse return;
+    std.log.debug("HL node level={s}, segment_start={d}, segment_end={d}, segments.len={d}", .{ node.level_code, node.segment_start, node.segment_end, segments.len });
     var seg_idx: usize = 0;
 
     for (level.segments) |seg_def| {
@@ -190,8 +141,11 @@ fn processHLNode(
                 }
 
                 if (matches) {
+                    // Create empty processed segments map for node-level segments
+                    var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+                    defer dummy_processed.deinit();
                     // Process segment into node object
-                    try processSegmentIntoObject(node_obj, segment, &seg_def, segments, seg_idx, allocator);
+                    try processSegmentIntoObject(node_obj, segment, &seg_def, segments, seg_idx, allocator, &dummy_processed);
                     seg_idx += 1;
                     break;
                 }
@@ -199,17 +153,23 @@ fn processHLNode(
         }
     }
 
-    // Process non-hierarchical loops for this level
+    // Process each non-hierarchical loop at this level
+    // Create a processed_segments map to track segments consumed by groups
+    var processed_segments = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+    defer processed_segments.deinit();
+
     for (level.non_hierarchical_loops) |loop| {
-        try processNonHierarchicalLoop(node_obj, &loop, segments, seg_idx, document, allocator);
+        _ = try processNonHierarchicalLoop(node_obj, &loop, segments, seg_idx, segments.len, document, allocator, &processed_segments);
     }
 
     // Add node to parent array
     try builder.pushToArray(parent_array_path, node_obj);
 
     // Process children - each child level has its own output_array nested within this node
+    std.log.debug("Node has {d} children", .{node.children.len});
     if (node.children.len > 0) {
         for (node.children) |*child| {
+            std.log.debug("Processing child with level_code: {s}", .{child.level_code});
             // Get the child's level definition to find its output_array
             const child_level = schema.getLevel(child.level_code) orelse continue;
             if (child_level.output_array) |child_array_name| {
@@ -219,6 +179,7 @@ fn processHLNode(
 
                 // Process the child node
                 const child_segments = child.getSegments(document.*) orelse continue;
+                std.log.debug("Child level={s}, segment_start={d}, segment_end={d}, segments.len={d}", .{ child.level_code, child.segment_start, child.segment_end, child_segments.len });
                 var child_seg_idx: usize = 0;
 
                 // Process segments for child level
@@ -244,7 +205,9 @@ fn processHLNode(
                                 }
                             }
                             if (matches) {
-                                try processSegmentIntoObject(child_obj, segment, &seg_def, child_segments, search_idx, allocator);
+                                var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+                                defer dummy_processed.deinit();
+                                try processSegmentIntoObject(child_obj, segment, &seg_def, child_segments, search_idx, allocator, &dummy_processed);
                                 child_seg_idx = search_idx + 1;
                                 break;
                             }
@@ -254,7 +217,9 @@ fn processHLNode(
 
                 // Process non-hierarchical loops for child
                 for (child_level.non_hierarchical_loops) |loop| {
-                    try processNonHierarchicalLoop(child_obj, &loop, child_segments, child_seg_idx, document, allocator);
+                    var child_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+                    defer child_processed.deinit();
+                    _ = try processNonHierarchicalLoop(child_obj, &loop, child_segments, child_seg_idx, child_segments.len, document, allocator, &child_processed);
                 }
 
                 // Add child array to parent object if it doesn't exist
@@ -282,6 +247,17 @@ fn processHLNode(
 
                             // Process the grandchild node
                             const grandchild_segments = grandchild.getSegments(document.*) orelse continue;
+                            std.log.debug("Grandchild level={s}, segment_start={d}, segment_end={d}, segments.len={d}", .{ grandchild.level_code, grandchild.segment_start, grandchild.segment_end, grandchild_segments.len });
+
+                            // Debug: List segments to find LX
+                            std.log.debug("First 150 grandchild segments:", .{});
+                            for (grandchild_segments, 0..) |seg, i| {
+                                if (i < 150) {
+                                    const first_elem = if (seg.elements.len > 1) seg.elements[1] else "";
+                                    std.log.debug("  [{d}] {s}: {s}", .{ i, seg.id, first_elem });
+                                }
+                            }
+
                             var grandchild_seg_idx: usize = 0;
 
                             // Process segments for grandchild level
@@ -306,7 +282,9 @@ fn processHLNode(
                                             }
                                         }
                                         if (matches) {
-                                            try processSegmentIntoObject(grandchild_obj, segment, &seg_def, grandchild_segments, search_idx, allocator);
+                                            var dummy_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+                                            defer dummy_processed.deinit();
+                                            try processSegmentIntoObject(grandchild_obj, segment, &seg_def, grandchild_segments, search_idx, allocator, &dummy_processed);
                                             grandchild_seg_idx = search_idx + 1;
                                             break;
                                         }
@@ -316,7 +294,9 @@ fn processHLNode(
 
                             // Process non-hierarchical loops for grandchild (e.g., claims)
                             for (grandchild_level.non_hierarchical_loops) |loop| {
-                                try processNonHierarchicalLoop(grandchild_obj, &loop, grandchild_segments, grandchild_seg_idx, document, allocator);
+                                var grandchild_processed = std.AutoHashMap(*const x12_parser.Segment, void).init(allocator);
+                                defer grandchild_processed.deinit();
+                                _ = try processNonHierarchicalLoop(grandchild_obj, &loop, grandchild_segments, grandchild_seg_idx, grandchild_segments.len, document, allocator, &grandchild_processed);
                             }
 
                             // Add grandchild array to child object if it doesn't exist
@@ -341,39 +321,224 @@ fn processHLNode(
 }
 
 /// Process non-hierarchical loop (repeating section within an HL level)
+/// Returns the maximum segment index processed (for nested loop tracking)
 fn processNonHierarchicalLoop(
     parent_obj: *JsonObject,
     loop: *const schema_mod.NonHierarchicalLoop,
     segments: []const x12_parser.Segment,
     start_idx: usize,
+    end_idx: usize,
     document: *const X12Document,
     allocator: std.mem.Allocator,
-) !void {
+    processed_segments: *std.AutoHashMap(*const x12_parser.Segment, void),
+) !usize {
     std.log.debug("Processing non-hierarchical loop: {s}, trigger: {s}, starting from index {d}", .{ loop.name, loop.trigger, start_idx });
 
     var seg_idx = start_idx;
+    var overall_max_idx = start_idx; // Track the furthest index across all loop instances
 
     // Find all instances of this loop (triggered by trigger segment)
-    while (seg_idx < segments.len) {
+    while (seg_idx < segments.len and seg_idx < end_idx) {
         const segment = &segments[seg_idx];
 
         // Check if this segment triggers the loop
         if (std.mem.eql(u8, segment.id, loop.trigger)) {
-            std.log.debug("Found loop trigger '{s}' at index {d}", .{ loop.trigger, seg_idx });
+            const first_elem = if (segment.elements.len > 0) segment.elements[0] else "";
+            std.log.debug("Found loop trigger '{s}' at index {d}, segment ID: {s}, first element: '{s}', total elements: {d}", .{ loop.trigger, seg_idx, segment.id, first_elem, segment.elements.len });
             // Create object for this loop instance
             var loop_obj = JsonObject.init(allocator);
 
             // Process segments for this loop instance
             var max_idx = seg_idx; // Track the furthest position we've processed
+
+            // Find the end boundary for this loop instance
+            // Should stop at: 1) next instance of this loop, OR 2) first nested loop trigger
+            var nested_end_idx = end_idx;
+            for (seg_idx + 1..end_idx) |search_idx| {
+                // Check if this is the next instance of the current loop
+                if (std.mem.eql(u8, segments[search_idx].id, loop.trigger)) {
+                    nested_end_idx = search_idx;
+                    break;
+                }
+                // Check if this is a nested loop trigger
+                for (loop.nested_loops) |nested_loop| {
+                    if (std.mem.eql(u8, segments[search_idx].id, nested_loop.trigger)) {
+                        if (search_idx < nested_end_idx) {
+                            nested_end_idx = search_idx;
+                        }
+                        break;
+                    }
+                }
+            }
+            std.log.debug("Loop instance boundary: seg_idx={d}, nested_end_idx={d}, end_idx={d}", .{ seg_idx, nested_end_idx, end_idx });
+
             std.log.debug("Processing segments for loop instance, starting from index {d}", .{seg_idx});
+
+            // Process segments with groups first, so they can claim their group members
+            // before other segment definitions try to process them
             for (loop.segments) |seg_def| {
+                if (seg_def.group == null) continue; // Skip non-group segments in first pass
+
+                std.log.debug("Looking for segment: {s} (multiple: {}, optional: {}) [GROUP PASS]", .{ seg_def.id, seg_def.multiple, seg_def.optional });
+                // Find matching segment(s) starting from loop start position
+                // This allows segments to appear in any order in the X12 file
+                var search_idx = seg_idx;
+                var found_any = false;
+                if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                    std.log.debug("NM1 GROUP search range: {d} to {d}", .{ seg_idx, nested_end_idx });
+                }
+                while (search_idx < segments.len and search_idx < nested_end_idx) : (search_idx += 1) {
+                    const inner_seg = &segments[search_idx];
+                    if (std.mem.eql(u8, seg_def.id, "NM1") and search_idx >= 90 and search_idx <= 95) {
+                        std.log.debug("Checking segment at index {d}: ID={s}", .{ search_idx, inner_seg.id });
+                    }
+
+                    // Skip if this segment was already processed by a group
+                    if (processed_segments.contains(inner_seg)) {
+                        if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                            std.log.debug("Skipping already-processed NM1 at index {d}", .{search_idx});
+                        }
+                        continue;
+                    }
+
+                    // Stop if we hit the next loop trigger (next instance of this loop)
+                    if (search_idx > seg_idx and std.mem.eql(u8, inner_seg.id, loop.trigger)) {
+                        if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                            std.log.debug("NM1 search breaking at index {d}: hit next loop trigger {s}", .{ search_idx, loop.trigger });
+                        }
+                        break;
+                    }
+
+                    // Stop if we hit a hierarchical segment (HL) - that's definitely a boundary
+                    if (std.mem.eql(u8, inner_seg.id, "HL")) {
+                        if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                            std.log.debug("NM1 search breaking at index {d}: hit HL segment", .{search_idx});
+                        }
+                        break;
+                    }
+
+                    // Note: We don't break on nested loop triggers here because the parent loop
+                    // may have segments (like NM1 groups) that come after nested loop triggers.
+                    // The processed_segments map will prevent double-processing.
+
+                    if (std.mem.eql(u8, inner_seg.id, seg_def.id)) {
+                        if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                            std.log.debug("Found NM1 at index {d}", .{search_idx});
+                        }
+                        // Check qualifier if specified
+                        var matches = true;
+                        if (seg_def.qualifier) |qual| {
+                            if (qual.len >= 2) {
+                                const pos = try std.fmt.parseInt(usize, qual[0], 10);
+                                const expected = qual[1];
+                                // Add 1 to pos to skip segment ID at position 0
+                                if (inner_seg.getElement(pos + 1)) |elem| {
+                                    if (!std.mem.eql(u8, elem, expected)) {
+                                        matches = false;
+                                    }
+                                } else {
+                                    matches = false;
+                                }
+                            }
+                        }
+
+                        if (matches) {
+                            // Process segment into loop object
+                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, allocator, processed_segments);
+                            found_any = true;
+
+                            // Mark this segment as processed
+                            try processed_segments.put(inner_seg, {});
+
+                            // Track furthest position
+                            if (search_idx >= max_idx) {
+                                std.log.debug("Updating max_idx from {d} to {d} (GROUP segment {s} at index {d})", .{ max_idx, search_idx + 1, seg_def.id, search_idx });
+                                max_idx = search_idx + 1;
+                            }
+
+                            // If not multiple, break after first match
+                            if (!seg_def.multiple) {
+                                break;
+                            }
+                            // Otherwise, continue searching for more instances
+                        }
+                    }
+                }
+
+                // If this was a non-multiple segment and we didn't find it, that's okay if it's optional
+                // If multiple, we might have found 0 or more, that's also okay
+            }
+
+            // Process nested loops after group segments but before non-group segments
+            // This allows nested loops to claim their segments before the parent loop's non-group processing
+            for (loop.nested_loops, 0..) |nested_loop, nested_idx| {
+                // Calculate end boundary for this specific nested loop
+                // It should stop at the next sibling nested loop trigger or the parent's end
+                var this_nested_end = end_idx;
+
+                // Find this nested loop's trigger position
+                var this_loop_start: ?usize = null;
+                for (seg_idx..end_idx) |search_idx| {
+                    if (std.mem.eql(u8, segments[search_idx].id, nested_loop.trigger)) {
+                        this_loop_start = search_idx;
+                        break;
+                    }
+                }
+
+                // If we found this loop's trigger, find where it should end
+                if (this_loop_start) |loop_start| {
+                    // Look for the next sibling nested loop trigger after this one starts
+                    for (loop_start + 1..end_idx) |search_idx| {
+                        // Check all sibling nested loops
+                        for (loop.nested_loops, 0..) |sibling_loop, sibling_idx| {
+                            if (sibling_idx != nested_idx and std.mem.eql(u8, segments[search_idx].id, sibling_loop.trigger)) {
+                                if (search_idx < this_nested_end) {
+                                    this_nested_end = search_idx;
+                                }
+                            }
+                        }
+                        // Also check for next instance of parent loop
+                        if (std.mem.eql(u8, segments[search_idx].id, loop.trigger)) {
+                            if (search_idx < this_nested_end) {
+                                this_nested_end = search_idx;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                const nested_max = try processNonHierarchicalLoop(&loop_obj, &nested_loop, segments, seg_idx, this_nested_end, document, allocator, processed_segments);
+                std.log.debug("Nested loop '{s}' returned max index: {d}, current max_idx: {d}", .{ nested_loop.name, nested_max, max_idx });
+                // Update max_idx to account for segments processed by nested loops
+                if (nested_max > max_idx) {
+                    std.log.debug("Updating max_idx from {d} to {d} based on nested loop", .{ max_idx, nested_max });
+                    max_idx = nested_max;
+                }
+                // Also update overall max
+                if (max_idx > overall_max_idx) {
+                    overall_max_idx = max_idx;
+                }
+            }
+
+            // Now process segments without groups
+            for (loop.segments) |seg_def| {
+                if (seg_def.group != null) continue; // Skip group segments in second pass
+
                 std.log.debug("Looking for segment: {s} (multiple: {}, optional: {})", .{ seg_def.id, seg_def.multiple, seg_def.optional });
                 // Find matching segment(s) starting from loop start position
                 // This allows segments to appear in any order in the X12 file
                 var search_idx = seg_idx;
                 var found_any = false;
-                while (search_idx < segments.len) : (search_idx += 1) {
+                while (search_idx < segments.len and search_idx < nested_end_idx) : (search_idx += 1) {
                     const inner_seg = &segments[search_idx];
+
+                    // Skip if this segment was already processed by a group
+                    if (processed_segments.contains(inner_seg)) {
+                        if (std.mem.eql(u8, seg_def.id, "NM1")) {
+                            std.log.debug("Skipping already-processed NM1 at index {d} (non-group pass)", .{search_idx});
+                        }
+                        continue;
+                    }
 
                     // Stop if we hit the next loop trigger (next instance of this loop)
                     if (search_idx > seg_idx and std.mem.eql(u8, inner_seg.id, loop.trigger)) {
@@ -384,6 +549,10 @@ fn processNonHierarchicalLoop(
                     if (std.mem.eql(u8, inner_seg.id, "HL")) {
                         break;
                     }
+
+                    // Note: We don't break on nested loop triggers here because the parent loop
+                    // may have segments that come after nested loop triggers.
+                    // The processed_segments map will prevent double-processing.
 
                     if (std.mem.eql(u8, inner_seg.id, seg_def.id)) {
                         // Check qualifier if specified
@@ -405,11 +574,15 @@ fn processNonHierarchicalLoop(
 
                         if (matches) {
                             // Process segment into loop object
-                            std.log.debug("Found matching segment '{s}' at index {d}", .{ seg_def.id, search_idx });
-                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, allocator);
+                            try processSegmentIntoObject(&loop_obj, inner_seg, &seg_def, segments, search_idx, allocator, processed_segments);
                             found_any = true;
+
+                            // Mark this segment as processed
+                            try processed_segments.put(inner_seg, {});
+
                             // Track furthest position
                             if (search_idx >= max_idx) {
+                                std.log.debug("Updating max_idx from {d} to {d} (segment {s} at index {d})", .{ max_idx, search_idx + 1, seg_def.id, search_idx });
                                 max_idx = search_idx + 1;
                             }
 
@@ -424,13 +597,6 @@ fn processNonHierarchicalLoop(
 
                 // If this was a non-multiple segment and we didn't find it, that's okay if it's optional
                 // If multiple, we might have found 0 or more, that's also okay
-            }
-
-            // Process nested loops if any
-            // Start nested loops from the loop trigger position, not from max_idx
-            // This allows nested loops to find segments that may have been interspersed with parent loop segments
-            for (loop.nested_loops) |nested_loop| {
-                try processNonHierarchicalLoop(&loop_obj, &nested_loop, segments, seg_idx, document, allocator);
             }
 
             // Add loop object to parent array
@@ -452,11 +618,20 @@ fn processNonHierarchicalLoop(
             }
 
             // Move to next potential loop instance using max_idx
+            std.log.debug("Moving to next loop instance: max_idx={d}, seg_idx before={d}", .{ max_idx, seg_idx });
+            // Update overall max before moving to next instance
+            if (max_idx > overall_max_idx) {
+                overall_max_idx = max_idx;
+            }
             seg_idx = max_idx;
+            std.log.debug("seg_idx after={d}, segments.len={d}", .{ seg_idx, segments.len });
         } else {
             seg_idx += 1;
         }
     }
+
+    // Return the furthest segment index we've seen across all loop instances
+    return overall_max_idx;
 }
 
 /// Process trailer segments (SE, GE, IEA)
@@ -579,24 +754,6 @@ fn processRepeatingElements(
     std.log.debug("processRepeatingElements: Processed {d} elements", .{element_count});
 }
 
-/// Process segment with path prefix
-fn processSegmentWithPrefix(
-    builder: *JsonBuilder,
-    segment: *const x12_parser.Segment,
-    seg_def: *const schema_mod.SegmentDef,
-    document: *const X12Document,
-    prefix: []const u8,
-    allocator: std.mem.Allocator,
-) !void {
-    for (seg_def.elements) |elem_def| {
-        // Build full path with prefix
-        const full_path = try std.fmt.allocPrint(allocator, "{s}.{s}", .{ prefix, elem_def.path });
-        defer allocator.free(full_path);
-
-        try processElementWithPath(builder, segment, &elem_def, document, full_path, allocator);
-    }
-}
-
 /// Process segment elements into an existing object
 fn processSegmentIntoObject(
     obj: *JsonObject,
@@ -605,8 +762,76 @@ fn processSegmentIntoObject(
     segments: []const x12_parser.Segment,
     segment_idx: usize,
     allocator: std.mem.Allocator,
+    processed_segments: *std.AutoHashMap(*const x12_parser.Segment, void),
 ) !void {
     std.log.debug("processSegmentIntoObject: segment '{s}', has {d} elements, repeating_elements: {}", .{ segment.id, seg_def.elements.len, seg_def.repeating_elements != null });
+
+    // Check if this is a multiple segment with qualifier mapping
+    // If so, we need to create a nested object based on the qualifier value
+    var target_obj = obj;
+    var qualifier_key: ?[]const u8 = null;
+    var should_cleanup_nested = false;
+    var use_direct_value = false; // Flag to indicate if we should flatten to a direct value
+
+    if (seg_def.multiple and seg_def.elements.len > 0) {
+        const first_elem = seg_def.elements[0];
+        // Check if first element is at position 0 (qualifier position)
+        if (first_elem.pos == 0) {
+            // Check if there's only one other element and it has an empty path (indicating flatten)
+            var element_count: usize = 0;
+            var has_empty_path = false;
+            for (seg_def.elements) |elem| {
+                if (elem.pos != 0) { // Skip qualifier
+                    element_count += 1;
+                    if (elem.path.len == 0 or std.mem.eql(u8, elem.path, ".")) {
+                        has_empty_path = true;
+                    }
+                }
+            }
+
+            // If there's only one non-qualifier element with empty path, use direct value
+            if (element_count == 1 and has_empty_path) {
+                use_direct_value = true;
+            }
+
+            // Get the qualifier value from the segment
+            if (segment.getElement(1)) |qualifier_value| { // pos 0 + 1 to skip segment ID
+                // Try to map the qualifier, or use the raw value if no mapping exists
+                var key_to_use: []const u8 = qualifier_value;
+                if (first_elem.map) |map| {
+                    if (map.get(qualifier_value)) |mapped_key| {
+                        key_to_use = mapped_key;
+                        std.log.debug("Multiple segment with qualifier mapping: '{s}' -> '{s}'", .{ qualifier_value, mapped_key });
+                    } else {
+                        std.log.debug("Multiple segment with unmapped qualifier: '{s}' (using raw value)", .{qualifier_value});
+                    }
+                } else {
+                    std.log.debug("Multiple segment with qualifier: '{s}' (no map defined, using raw value)", .{qualifier_value});
+                }
+
+                // Need to allocate the key if it's the raw qualifier value (not already in schema)
+                if (key_to_use.ptr == qualifier_value.ptr) {
+                    key_to_use = try allocator.dupe(u8, qualifier_value);
+                }
+                qualifier_key = key_to_use;
+
+                if (!use_direct_value) {
+                    // Get or create nested object for this qualifier
+                    if (obj.get(key_to_use)) |existing| {
+                        // Object already exists, use it
+                        target_obj = existing.object;
+                    } else {
+                        // Create new nested object
+                        const nested_obj_ptr = try allocator.create(JsonObject);
+                        nested_obj_ptr.* = JsonObject.init(allocator);
+                        try obj.put(key_to_use, JsonValue{ .object = nested_obj_ptr });
+                        target_obj = nested_obj_ptr;
+                        should_cleanup_nested = true;
+                    }
+                }
+            }
+        }
+    }
 
     // Process elements from current segment
     for (seg_def.elements) |elem_def| {
@@ -615,6 +840,11 @@ fn processSegmentIntoObject(
             if (!std.mem.eql(u8, seg_id, segment.id)) {
                 continue;
             }
+        }
+
+        // Skip the qualifier element if we're using it for nested object key
+        if (qualifier_key != null and elem_def.pos == 0) {
+            continue;
         }
 
         // Add 1 to pos to skip segment ID at position 0
@@ -654,41 +884,122 @@ fn processSegmentIntoObject(
             // Create owned string
             const owned = try allocator.dupe(u8, value);
 
-            // Add to object at the path (just last part)
-            var path_parts = std.mem.splitScalar(u8, elem_def.path, '.');
-            var last_part: []const u8 = elem_def.path;
-            while (path_parts.next()) |part| {
-                if (path_parts.rest().len == 0) {
-                    last_part = part;
+            // Check if we should use direct value (flatten)
+            if (use_direct_value and qualifier_key != null and (elem_def.path.len == 0 or std.mem.eql(u8, elem_def.path, "."))) {
+                // Put the value directly on the parent object with the qualifier key
+                try obj.put(qualifier_key.?, JsonValue{ .string = owned });
+            } else {
+                // Add to object at the path (just last part)
+                var path_parts = std.mem.splitScalar(u8, elem_def.path, '.');
+                var last_part: []const u8 = elem_def.path;
+                while (path_parts.next()) |part| {
+                    if (path_parts.rest().len == 0) {
+                        last_part = part;
+                    }
                 }
-            }
 
-            try obj.put(last_part, JsonValue{ .string = owned });
+                try target_obj.put(last_part, JsonValue{ .string = owned });
+            }
         }
     }
 
     // Process repeating elements if configured
     if (seg_def.repeating_elements) |rep_config| {
         std.log.debug("Processing repeating elements with separator '{s}', {d} patterns", .{ rep_config.separator, rep_config.patterns.len });
-        try processRepeatingElements(obj, segment, &rep_config, allocator);
+        try processRepeatingElements(target_obj, segment, &rep_config, allocator);
     }
 
     // If this segment has a group, look for the group segments and process them too
     if (seg_def.group) |group| {
         // Process subsequent segments that are part of the group
-        var search_idx = segment_idx + 1;
+        const group_start_idx = segment_idx + 1;
         for (group[1..]) |group_seg_id| { // Skip first as it's the current segment
-            // Search for this segment starting from current position
-            var found = false;
-            while (search_idx < segments.len) : (search_idx += 1) {
-                const group_segment = &segments[search_idx];
+            // Search for this segment starting from group start position
+            var found_any = false;
+            var current_search = group_start_idx;
+
+            // Find ALL instances of this segment type in the group
+            while (current_search < segments.len) : (current_search += 1) {
+                const group_segment = &segments[current_search];
+
+                // Stop searching if we hit a structural segment that indicates the group has ended
+                // Don't stop on the trigger segment itself as we're looking within the group
+                if (std.mem.eql(u8, group_segment.id, "HL") or
+                    std.mem.eql(u8, group_segment.id, "CLM") or
+                    std.mem.eql(u8, group_segment.id, "SBR") or
+                    std.mem.eql(u8, group_segment.id, "LX"))
+                {
+                    break;
+                }
+
+                // Stop if we hit another instance of the trigger segment (start of next group)
+                if (current_search > segment_idx and std.mem.eql(u8, group_segment.id, segment.id)) {
+                    break;
+                }
 
                 // Check if this is the segment we're looking for
                 if (std.mem.eql(u8, group_segment.id, group_seg_id)) {
+                    found_any = true;
+
+                    // Mark this segment as processed so parent loop doesn't process it again
+                    try processed_segments.put(group_segment, {});
+
+                    // Check if this segment type can appear multiple times by looking for qualifier mapping
+                    // Only apply this for segments that typically appear multiple times (REF, DTP, etc.)
+                    var group_target_obj = target_obj;
+                    var group_qualifier_key: ?[]const u8 = null;
+
+                    // Check if this is a segment type that can appear multiple times
+                    const is_multiple_segment = std.mem.eql(u8, group_seg_id, "REF") or
+                        std.mem.eql(u8, group_seg_id, "DTP") or
+                        std.mem.eql(u8, group_seg_id, "NTE") or
+                        std.mem.eql(u8, group_seg_id, "PER");
+
+                    if (is_multiple_segment) {
+                        // Find the first element for this segment that might have a qualifier map
+                        for (seg_def.elements) |elem_def| {
+                            if (elem_def.seg) |seg_id| {
+                                if (std.mem.eql(u8, seg_id, group_seg_id) and elem_def.pos == 0) {
+                                    // Get qualifier value and check for mapping
+                                    if (group_segment.getElement(1)) |qualifier_value| {
+                                        var key_to_use: []const u8 = qualifier_value;
+                                        if (elem_def.map) |map| {
+                                            if (map.get(qualifier_value)) |mapped_key| {
+                                                key_to_use = mapped_key;
+                                            }
+                                        }
+
+                                        // Allocate if using raw qualifier
+                                        if (key_to_use.ptr == qualifier_value.ptr) {
+                                            key_to_use = try allocator.dupe(u8, qualifier_value);
+                                        }
+                                        group_qualifier_key = key_to_use;
+
+                                        // Create or get nested object for this qualifier
+                                        if (target_obj.get(key_to_use)) |existing| {
+                                            group_target_obj = existing.object;
+                                        } else {
+                                            const nested_obj_ptr = try allocator.create(JsonObject);
+                                            nested_obj_ptr.* = JsonObject.init(allocator);
+                                            try target_obj.put(key_to_use, JsonValue{ .object = nested_obj_ptr });
+                                            group_target_obj = nested_obj_ptr;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // Process elements from this group segment
                     for (seg_def.elements) |elem_def| {
                         if (elem_def.seg) |seg_id| {
                             if (std.mem.eql(u8, seg_id, group_seg_id)) {
+                                // Skip qualifier element if we used it for nested object key
+                                if (group_qualifier_key != null and elem_def.pos == 0) {
+                                    continue;
+                                }
+
                                 // Add 1 to pos to skip segment ID at position 0
                                 if (group_segment.getElement(elem_def.pos + 1)) |raw_value| {
                                     var value = raw_value;
@@ -698,36 +1009,27 @@ fn processSegmentIntoObject(
                                         }
                                     }
                                     const owned = try allocator.dupe(u8, value);
-                                    var path_parts = std.mem.splitScalar(u8, elem_def.path, '.');
-                                    var last_part: []const u8 = elem_def.path;
-                                    while (path_parts.next()) |part| {
-                                        if (path_parts.rest().len == 0) {
-                                            last_part = part;
+
+                                    // Check if we should use direct value for groups (flatten)
+                                    if (group_qualifier_key != null and (elem_def.path.len == 0 or std.mem.eql(u8, elem_def.path, "."))) {
+                                        // Put the value directly on the parent object with the qualifier key
+                                        try target_obj.put(group_qualifier_key.?, JsonValue{ .string = owned });
+                                    } else {
+                                        var path_parts = std.mem.splitScalar(u8, elem_def.path, '.');
+                                        var last_part: []const u8 = elem_def.path;
+                                        while (path_parts.next()) |part| {
+                                            if (path_parts.rest().len == 0) {
+                                                last_part = part;
+                                            }
                                         }
+                                        try group_target_obj.put(last_part, JsonValue{ .string = owned });
                                     }
-                                    try obj.put(last_part, JsonValue{ .string = owned });
                                 }
                             }
                         }
                     }
-                    search_idx += 1;
-                    found = true;
-                    break; // Found and processed, move to next group segment
-                }
-
-                // Stop searching if we hit a segment that indicates the group has ended
-                // (another segment with the same ID as our trigger, or a structural segment)
-                if (std.mem.eql(u8, group_segment.id, segment.id) or
-                    std.mem.eql(u8, group_segment.id, "HL") or
-                    std.mem.eql(u8, group_segment.id, "CLM") or
-                    std.mem.eql(u8, group_segment.id, "SBR"))
-                {
-                    break; // Stop searching for this group segment
                 }
             }
-
-            // If we didn't find the segment, stop looking for the rest of the group
-            if (!found) break;
         }
     }
 }
@@ -787,54 +1089,6 @@ fn processElement(
     }
 }
 
-/// Process element with custom path
-fn processElementWithPath(
-    builder: *JsonBuilder,
-    segment: *const x12_parser.Segment,
-    elem_def: *const schema_mod.ElementMapping,
-    document: *const X12Document,
-    path: []const u8,
-    allocator: std.mem.Allocator,
-) !void {
-    // Add 1 to pos to skip segment ID at position 0
-    if (segment.getElement(elem_def.pos + 1)) |raw_value| {
-        var value = raw_value;
-
-        // Handle composite elements (extract sub-component)
-        if (elem_def.composite) |comp_indices| {
-            if (comp_indices.len > 0) {
-                const comp_idx = comp_indices[0]; // Use first index specified
-                // Split by composite delimiter
-                var iter = std.mem.splitScalar(u8, raw_value, document.delimiters.composite);
-                var idx: usize = 0;
-                var found = false;
-                while (iter.next()) |component| : (idx += 1) {
-                    if (idx == comp_idx) {
-                        value = component;
-                        found = true;
-                        break;
-                    }
-                }
-                // If composite index not found, skip this element
-                if (!found or value.len == 0) return;
-            }
-        }
-
-        // Apply value mapping if specified
-        if (elem_def.map) |map| {
-            if (map.get(value)) |mapped| {
-                value = mapped;
-            }
-        }
-
-        // Check expected value if specified
-        const owned = try allocator.dupe(u8, value);
-
-        // Set in builder with custom path
-        try builder.set(path, JsonValue{ .string = owned });
-    }
-}
-
 // ============================================================================
 // UNIT TESTS
 // ============================================================================
@@ -845,7 +1099,7 @@ test "process simple X12 document" {
     const file = try std.fs.cwd().openFile("samples/simple_test.x12", .{ .mode = .read_only });
     defer file.close();
     // Process document
-    var output = try processDocument(allocator, file, "schema/837p.json");
+    var output = try processDocument(allocator, file, "schema/837p.json", null);
     defer output.deinit(allocator);
 
     // Check output contains expected fields
@@ -865,7 +1119,7 @@ test "process document with HL hierarchy" {
     );
     defer x12_file.close();
     // Use existing sample file
-    var output = try processDocument(allocator, x12_file, "schema/837p.json");
+    var output = try processDocument(allocator, x12_file, "schema/837p.json", null);
     defer output.deinit(allocator);
 
     // Check output contains hierarchical structure
