@@ -514,6 +514,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Authors
 
 - Bedrock Billing - [support@bedrockbilling.com](mailto:support@bedrockbilling.com)
+- Bedrock Billing - [support@bedrockbilling.com](mailto:support@bedrockbilling.com)
 
 ## Acknowledgments
 
