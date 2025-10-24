@@ -9,7 +9,7 @@ version = "0.1.0"
 license = "MIT"
 authors = [
   { name="Jacob Wilson", email="jjw07006@gmail.com" },
-  { name="Josh Lankford", email="lankford.josh@gmail.com" }
+  { name="Josh Lankford", email="lankford.josh@gmail.com"}
 ]
 description = "A Python wrapper for the zX12 library."
 readme = "README.md"
