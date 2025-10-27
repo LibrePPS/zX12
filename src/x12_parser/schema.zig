@@ -77,6 +77,7 @@ pub const SegmentDef = struct {
     optional: bool = false, // Whether segment is optional
     multiple: bool = false, // Whether segment can appear multiple times
     max_use: ?usize = null, // Maximum times segment can appear
+    cloned: bool = false, // Whether segment is cloned
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: *SegmentDef) void {
@@ -93,6 +94,11 @@ pub const SegmentDef = struct {
             self.allocator.free(q);
         }
         if (self.group) |g| {
+            if (self.cloned) {
+                for (g) |group_str| {
+                    self.allocator.free(group_str);
+                }
+            }
             self.allocator.free(g);
         }
         if (self.repeating_elements) |*rep| {
@@ -167,6 +173,37 @@ pub const SequentialSection = struct {
     }
 };
 
+/// Definitions for reusable schema components
+pub const Definitions = struct {
+    loops: std.StringHashMap(NonHierarchicalLoop),
+    segments: std.StringHashMap(SegmentDef),
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) Definitions {
+        return .{
+            .loops = std.StringHashMap(NonHierarchicalLoop).init(allocator),
+            .segments = std.StringHashMap(SegmentDef).init(allocator),
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *Definitions) void {
+        var loop_iter = self.loops.valueIterator();
+        while (loop_iter.next()) |loop| {
+            var l = loop.*;
+            l.deinit();
+        }
+        self.loops.deinit();
+
+        var seg_iter = self.segments.valueIterator();
+        while (seg_iter.next()) |seg| {
+            var s = seg.*;
+            s.deinit();
+        }
+        self.segments.deinit();
+    }
+};
+
 /// Schema for an X12 transaction
 pub const Schema = struct {
     version: []const u8, // Schema version (e.g., "2.0")
@@ -182,6 +219,9 @@ pub const Schema = struct {
     trailer_segments: []SegmentDef,
 
     hierarchical_output_array: []const u8, // Top-level array name
+
+    // Reusable definitions
+    definitions: Definitions,
 
     allocator: std.mem.Allocator,
 
@@ -211,6 +251,9 @@ pub const Schema = struct {
             seg.deinit();
         }
         self.allocator.free(self.trailer_segments);
+
+        // Free definitions
+        self.definitions.deinit();
 
         // Free JSON content
         self._json_parsed.deinit();
@@ -299,6 +342,39 @@ pub fn loadSchema(allocator: std.mem.Allocator, file_path: []const u8) !Schema {
     const transaction_type = transaction.get("type").?.string;
     const description = transaction.get("description").?.string;
 
+    // Parse definitions (if present)
+    var definitions = Definitions.init(allocator);
+    errdefer definitions.deinit();
+
+    if (root.get("definitions")) |defs_value| {
+        const defs_obj = defs_value.object;
+
+        // Parse loop definitions
+        if (defs_obj.get("loops")) |loops_value| {
+            const loops_obj = loops_value.object;
+            var loops_iter = loops_obj.iterator();
+            while (loops_iter.next()) |entry| {
+                const loop_name = entry.key_ptr.*;
+                const loop_obj = entry.value_ptr.*.object;
+                // Don't pass definitions when parsing definitions themselves
+                const loop = try parseNonHierarchicalLoop(allocator, loop_obj, null);
+                try definitions.loops.put(loop_name, loop);
+            }
+        }
+
+        // Parse segment definitions
+        if (defs_obj.get("segments")) |segments_value| {
+            const segments_obj = segments_value.object;
+            var segments_iter = segments_obj.iterator();
+            while (segments_iter.next()) |entry| {
+                const seg_name = entry.key_ptr.*;
+                const seg_obj = entry.value_ptr.*.object;
+                const seg = try parseSegment(allocator, seg_obj, null);
+                try definitions.segments.put(seg_name, seg);
+            }
+        }
+    }
+
     // Parse header segments
     const header_obj = root.get("transaction_header").?.object;
     const header_segments_json = header_obj.get("segments").?.array;
@@ -359,7 +435,7 @@ pub fn loadSchema(allocator: std.mem.Allocator, file_path: []const u8) !Schema {
         const level_code = entry.key_ptr.*;
         const level_obj = entry.value_ptr.*.object;
 
-        const level = try parseHLLevel(allocator, level_code, level_obj);
+        const level = try parseHLLevel(allocator, level_code, level_obj, &definitions);
         try hl_levels.put(level_code, level);
     }
 
@@ -385,6 +461,7 @@ pub fn loadSchema(allocator: std.mem.Allocator, file_path: []const u8) !Schema {
         .hl_levels = hl_levels,
         .trailer_segments = trailer_segments,
         .hierarchical_output_array = hier_output_array,
+        .definitions = definitions,
         .allocator = allocator,
         ._json_content = content,
         ._json_parsed = parsed,
@@ -392,12 +469,12 @@ pub fn loadSchema(allocator: std.mem.Allocator, file_path: []const u8) !Schema {
 }
 
 /// Parse HL level from JSON
-fn parseHLLevel(allocator: std.mem.Allocator, level_code: []const u8, level_obj: std.json.ObjectMap) !HLLevel {
+fn parseHLLevel(allocator: std.mem.Allocator, level_code: []const u8, level_obj: std.json.ObjectMap, definitions: *const Definitions) !HLLevel {
     const name = level_obj.get("name").?.string;
     const output_array = if (level_obj.get("output_array")) |arr| arr.string else null;
     const segments_json = level_obj.get("segments").?.array;
 
-    const segments = try parseSegments(allocator, segments_json.items);
+    const segments = try parseSegmentsWithDefs(allocator, segments_json.items, definitions);
     errdefer {
         for (segments) |*seg| {
             seg.deinit();
@@ -423,7 +500,7 @@ fn parseHLLevel(allocator: std.mem.Allocator, level_code: []const u8, level_obj:
         errdefer allocator.free(loops);
 
         for (loops_json.items, 0..) |loop_value, i| {
-            loops[i] = try parseNonHierarchicalLoop(allocator, loop_value.object);
+            loops[i] = try parseNonHierarchicalLoop(allocator, loop_value.object, definitions);
         }
         non_hierarchical_loops = loops;
     }
@@ -440,13 +517,40 @@ fn parseHLLevel(allocator: std.mem.Allocator, level_code: []const u8, level_obj:
 }
 
 /// Parse non-hierarchical loop from JSON
-fn parseNonHierarchicalLoop(allocator: std.mem.Allocator, loop_obj: std.json.ObjectMap) !NonHierarchicalLoop {
-    const name = loop_obj.get("name").?.string;
+fn parseNonHierarchicalLoop(allocator: std.mem.Allocator, loop_obj: std.json.ObjectMap, definitions: ?*const Definitions) !NonHierarchicalLoop {
+    // Check if this is a reference
+    if (loop_obj.get("$ref")) |ref_value| {
+        const ref_path = ref_value.string;
+        // Parse reference path like "#/definitions/loops/claim_loop_2300"
+        if (std.mem.startsWith(u8, ref_path, "#/definitions/loops/")) {
+            const loop_name = ref_path["#/definitions/loops/".len..];
+            if (definitions) |defs| {
+                if (defs.loops.get(loop_name)) |base_loop| {
+                    // Clone the base loop and apply any overrides
+                    var cloned_loop = try cloneNonHierarchicalLoop(allocator, base_loop);
+
+                    // Apply overrides from loop_obj
+                    if (loop_obj.get("name")) |name_override| {
+                        cloned_loop.name = name_override.string;
+                    }
+                    if (loop_obj.get("output_array")) |output_override| {
+                        cloned_loop.output_array = output_override.string;
+                    }
+
+                    return cloned_loop;
+                }
+            }
+        }
+        return error.InvalidReference;
+    }
+
+    // When parsing definitions, name and output_array are optional
+    const name = if (loop_obj.get("name")) |n| n.string else "";
     const trigger = loop_obj.get("trigger").?.string;
-    const output_array = loop_obj.get("output_array").?.string;
+    const output_array = if (loop_obj.get("output_array")) |o| o.string else "";
     const segments_json = loop_obj.get("segments").?.array;
 
-    const segments = try parseSegments(allocator, segments_json.items);
+    const segments = try parseSegmentsWithDefs(allocator, segments_json.items, definitions);
     errdefer {
         for (segments) |*seg| {
             seg.deinit();
@@ -462,7 +566,7 @@ fn parseNonHierarchicalLoop(allocator: std.mem.Allocator, loop_obj: std.json.Obj
         errdefer allocator.free(nested);
 
         for (nested_json.items, 0..) |nested_value, i| {
-            nested[i] = try parseNonHierarchicalLoop(allocator, nested_value.object);
+            nested[i] = try parseNonHierarchicalLoop(allocator, nested_value.object, definitions);
         }
         nested_loops = nested;
     }
@@ -479,19 +583,54 @@ fn parseNonHierarchicalLoop(allocator: std.mem.Allocator, loop_obj: std.json.Obj
 
 /// Parse segments array from JSON
 fn parseSegments(allocator: std.mem.Allocator, segments_json: []const std.json.Value) ![]SegmentDef {
+    return parseSegmentsWithDefs(allocator, segments_json, null);
+}
+
+/// Parse segments array from JSON with definitions support
+fn parseSegmentsWithDefs(allocator: std.mem.Allocator, segments_json: []const std.json.Value, definitions: ?*const Definitions) ![]SegmentDef {
     const segments = try allocator.alloc(SegmentDef, segments_json.len);
     errdefer allocator.free(segments);
 
     for (segments_json, 0..) |seg_value, i| {
         const seg_obj = seg_value.object;
-        segments[i] = try parseSegment(allocator, seg_obj);
+        segments[i] = try parseSegment(allocator, seg_obj, definitions);
     }
 
     return segments;
 }
 
 /// Parse single segment from JSON
-fn parseSegment(allocator: std.mem.Allocator, seg_obj: std.json.ObjectMap) !SegmentDef {
+fn parseSegment(allocator: std.mem.Allocator, seg_obj: std.json.ObjectMap, definitions: ?*const Definitions) !SegmentDef {
+    // Check if this is a reference
+    if (seg_obj.get("$ref")) |ref_value| {
+        const ref_path = ref_value.string;
+        // Parse reference path like "#/definitions/segments/standard_nm1_billing"
+        if (std.mem.startsWith(u8, ref_path, "#/definitions/segments/")) {
+            const seg_name = ref_path["#/definitions/segments/".len..];
+            if (definitions) |defs| {
+                if (defs.segments.get(seg_name)) |base_seg| {
+                    // Clone the base segment and apply any overrides
+                    var cloned_seg = try cloneSegmentDef(allocator, base_seg);
+
+                    // Apply overrides from seg_obj
+                    // Note: qualifier and group are complex structures that should not be overridden via reference
+                    // If needed, they should be defined in the base definition
+                    if (seg_obj.get("optional")) |optional_override| {
+                        cloned_seg.optional = optional_override.bool;
+                    }
+                    if (seg_obj.get("multiple")) |multiple_override| {
+                        cloned_seg.multiple = multiple_override.bool;
+                    }
+                    if (seg_obj.get("max_use")) |max_use_override| {
+                        cloned_seg.max_use = @intCast(max_use_override.integer);
+                    }
+
+                    return cloned_seg;
+                }
+            }
+        }
+        return error.InvalidReference;
+    }
     const id = seg_obj.get("id").?.string;
     const optional = if (seg_obj.get("optional")) |opt| opt.bool else false;
     const multiple = if (seg_obj.get("multiple")) |mult| mult.bool else false;
@@ -674,6 +813,172 @@ fn parseRepeatingElementPattern(allocator: std.mem.Allocator, pattern_obj: std.j
 // ============================================================================
 // UNIT TESTS
 // ============================================================================
+
+/// Clone a non-hierarchical loop (deep copy for reference resolution)
+fn cloneNonHierarchicalLoop(allocator: std.mem.Allocator, source: NonHierarchicalLoop) !NonHierarchicalLoop {
+    // Clone segments
+    const segments = try allocator.alloc(SegmentDef, source.segments.len);
+    errdefer allocator.free(segments);
+
+    for (source.segments, 0..) |seg, i| {
+        segments[i] = try cloneSegmentDef(allocator, seg);
+    }
+
+    // Clone nested loops
+    var nested_loops: []NonHierarchicalLoop = &[_]NonHierarchicalLoop{};
+    if (source.nested_loops.len > 0) {
+        const nested = try allocator.alloc(NonHierarchicalLoop, source.nested_loops.len);
+        errdefer allocator.free(nested);
+
+        for (source.nested_loops, 0..) |nested_loop, i| {
+            nested[i] = try cloneNonHierarchicalLoop(allocator, nested_loop);
+        }
+        nested_loops = nested;
+    }
+
+    return NonHierarchicalLoop{
+        .name = source.name,
+        .trigger = source.trigger,
+        .output_array = source.output_array,
+        .segments = segments,
+        .nested_loops = nested_loops,
+        .allocator = allocator,
+    };
+}
+
+/// Clone a segment definition (deep copy for reference resolution)
+fn cloneSegmentDef(allocator: std.mem.Allocator, source: SegmentDef) !SegmentDef {
+    // Clone elements
+    const elements = try allocator.alloc(ElementMapping, source.elements.len);
+    errdefer allocator.free(elements);
+
+    for (source.elements, 0..) |elem, i| {
+        elements[i] = try cloneElementMapping(allocator, elem);
+    }
+
+    // Clone repeating_elements if present
+    var repeating_elements: ?RepeatingElements = null;
+    if (source.repeating_elements) |rep_elem| {
+        repeating_elements = try cloneRepeatingElements(allocator, rep_elem);
+    }
+
+    // Deep copy qualifier if present
+    var cloned_qualifier: ?[]const []const u8 = null;
+    if (source.qualifier) |src_qual| {
+        const new_qual = try allocator.alloc([]const u8, src_qual.len);
+        errdefer allocator.free(new_qual);
+        for (src_qual, 0..) |qual_str, i| {
+            new_qual[i] = try allocator.dupe(u8, qual_str);
+        }
+        cloned_qualifier = new_qual;
+    }
+
+    // Deep copy group if present
+    var cloned_group: ?[]const []const u8 = null;
+    if (source.group) |src_grp| {
+        const new_grp = try allocator.alloc([]const u8, src_grp.len);
+        errdefer allocator.free(new_grp);
+        for (src_grp, 0..) |grp_str, i| {
+            new_grp[i] = try allocator.dupe(u8, grp_str);
+        }
+        cloned_group = new_grp;
+    }
+
+    return SegmentDef{
+        .id = source.id,
+        .qualifier = cloned_qualifier,
+        .group = cloned_group,
+        .elements = elements,
+        .repeating_elements = repeating_elements,
+        .optional = source.optional,
+        .multiple = source.multiple,
+        .max_use = source.max_use,
+        .allocator = allocator,
+        .cloned = true,
+    };
+}
+
+/// Clone an element mapping (deep copy for reference resolution)
+fn cloneElementMapping(allocator: std.mem.Allocator, source: ElementMapping) !ElementMapping {
+    // Deep copy the map if present
+    var cloned_map: ?std.StringHashMap([]const u8) = null;
+    if (source.map) |src_map| {
+        var new_map = std.StringHashMap([]const u8).init(allocator);
+        var iter = src_map.iterator();
+        while (iter.next()) |entry| {
+            try new_map.put(entry.key_ptr.*, entry.value_ptr.*);
+        }
+        cloned_map = new_map;
+    }
+
+    // Deep copy transform array if present
+    var cloned_transform: ?[]const []const u8 = null;
+    if (source.transform) |src_transform| {
+        const new_transform = try allocator.alloc([]const u8, src_transform.len);
+        for (src_transform, 0..) |item, i| {
+            new_transform[i] = item;
+        }
+        cloned_transform = new_transform;
+    }
+
+    // Deep copy composite array if present
+    var cloned_composite: ?[]usize = null;
+    if (source.composite) |src_composite| {
+        const new_composite = try allocator.alloc(usize, src_composite.len);
+        for (src_composite, 0..) |item, i| {
+            new_composite[i] = item;
+        }
+        cloned_composite = new_composite;
+    }
+
+    return ElementMapping{
+        .seg = source.seg,
+        .pos = source.pos,
+        .path = source.path,
+        .expect = source.expect,
+        .map = cloned_map,
+        .transform = cloned_transform,
+        .optional = source.optional,
+        .composite = cloned_composite,
+        .allocator = allocator,
+    };
+}
+
+/// Clone repeating elements (deep copy for reference resolution)
+fn cloneRepeatingElements(allocator: std.mem.Allocator, source: RepeatingElements) !RepeatingElements {
+    const patterns = try allocator.alloc(RepeatingElementPattern, source.patterns.len);
+    errdefer allocator.free(patterns);
+
+    for (source.patterns, 0..) |pattern, i| {
+        const fields = try allocator.alloc(RepeatingElementField, pattern.fields.len);
+        errdefer allocator.free(fields);
+
+        for (pattern.fields, 0..) |field, j| {
+            fields[j] = field; // Simple copy since fields are just data
+        }
+
+        // Deep copy when_qualifier array
+        const when_qualifier = try allocator.alloc([]const u8, pattern.when_qualifier.len);
+        errdefer allocator.free(when_qualifier);
+        for (pattern.when_qualifier, 0..) |qual, k| {
+            when_qualifier[k] = try allocator.dupe(u8, qual);
+        }
+
+        patterns[i] = RepeatingElementPattern{
+            .when_qualifier = when_qualifier,
+            .output_array = pattern.output_array,
+            .fields = fields,
+            .allocator = allocator,
+        };
+    }
+
+    return RepeatingElements{
+        .all = source.all,
+        .separator = source.separator,
+        .patterns = patterns,
+        .allocator = allocator,
+    };
+}
 
 test "load 837P schema" {
     const allocator = testing.allocator;
@@ -867,4 +1172,91 @@ test "collect boundary segments from 837P schema" {
     try testing.expect(!boundaries.contains("REF"));
     try testing.expect(!boundaries.contains("NM1"));
     try testing.expect(!boundaries.contains("DTP"));
+}
+
+test "schema with definitions and references" {
+    const allocator = testing.allocator;
+    var schema = try loadSchema(allocator, "schema/837i.json");
+    defer schema.deinit();
+
+    // Check that definitions were loaded
+    try testing.expect(schema.definitions.loops.count() > 0);
+
+    // Verify loop definition exists
+    const claim_loop_def = schema.definitions.loops.get("institutional_claim_loop_2300");
+    try testing.expect(claim_loop_def != null);
+    try testing.expectEqualStrings("CLM", claim_loop_def.?.trigger);
+
+    // Check that references were resolved in subscriber level (22)
+    const level22 = schema.getLevel("22");
+    try testing.expect(level22 != null);
+    try testing.expectEqualStrings("Subscriber", level22.?.name);
+
+    // Subscriber should have non-hierarchical loops (via reference)
+    try testing.expect(level22.?.non_hierarchical_loops.len > 0);
+    const subscriber_claims = &level22.?.non_hierarchical_loops[0];
+
+    // Check that the claim loop has segments (from the definition)
+    try testing.expect(subscriber_claims.segments.len > 0);
+    try testing.expectEqualStrings("CLM", subscriber_claims.segments[0].id);
+
+    // Check that references were resolved in patient level (23)
+    const level23 = schema.getLevel("23");
+    try testing.expect(level23 != null);
+    try testing.expectEqualStrings("Patient", level23.?.name);
+
+    // Patient should also have claims loop (via same reference)
+    try testing.expect(level23.?.non_hierarchical_loops.len > 0);
+    const patient_claims = &level23.?.non_hierarchical_loops[0];
+
+    // Both should have the same structure from the definition
+    try testing.expect(patient_claims.segments.len == subscriber_claims.segments.len);
+    try testing.expect(patient_claims.nested_loops.len == subscriber_claims.nested_loops.len);
+
+    // Check that segment references were resolved in billing provider (20)
+    const level20 = schema.getLevel("20");
+    try testing.expect(level20 != null);
+
+    // Find the referenced NM1 segment
+    var found_nm1_ref = false;
+    for (level20.?.segments) |seg| {
+        if (std.mem.eql(u8, seg.id, "NM1") and seg.qualifier != null) {
+            found_nm1_ref = true;
+            // Should have elements from the definition
+            try testing.expect(seg.elements.len > 0);
+            break;
+        }
+    }
+    try testing.expect(found_nm1_ref);
+}
+
+test "load refactored 837I schema with definitions" {
+    const allocator = testing.allocator;
+    var s = try loadSchema(allocator, "schema/837i.json");
+    defer s.deinit();
+
+    try testing.expectEqualStrings("837I", s.transaction_id);
+
+    // Check definitions were loaded
+    try testing.expect(s.definitions.loops.count() > 0);
+    const claim_def = s.definitions.loops.get("institutional_claim_loop_2300");
+    try testing.expect(claim_def != null);
+
+    // Check that level 22 (Subscriber) has claims loop via reference
+    const level22 = s.getLevel("22");
+    try testing.expect(level22 != null);
+    try testing.expect(level22.?.non_hierarchical_loops.len > 0);
+    try testing.expectEqualStrings("Claims", level22.?.non_hierarchical_loops[0].name);
+    try testing.expectEqualStrings("CLM", level22.?.non_hierarchical_loops[0].trigger);
+
+    // Check that level 23 (Patient) also has claims loop via reference
+    const level23 = s.getLevel("23");
+    try testing.expect(level23 != null);
+    try testing.expect(level23.?.non_hierarchical_loops.len > 0);
+    try testing.expectEqualStrings("Claims", level23.?.non_hierarchical_loops[0].name);
+    try testing.expectEqualStrings("CLM", level23.?.non_hierarchical_loops[0].trigger);
+
+    // Verify they have the same structure (from the same definition)
+    try testing.expect(level22.?.non_hierarchical_loops[0].segments.len ==
+        level23.?.non_hierarchical_loops[0].segments.len);
 }
