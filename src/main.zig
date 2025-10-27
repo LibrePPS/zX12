@@ -2,6 +2,7 @@ const std = @import("std");
 const document_processor = @import("x12_parser/document_processor.zig");
 const schema_load = @import("x12_parser/schema.zig").loadSchema;
 const Schema = @import("x12_parser/schema.zig").Schema;
+pub const X12_File = document_processor.X12_File;
 // ============================================================================
 // C API for X12 Document Processing
 // ============================================================================
@@ -82,17 +83,12 @@ export fn zx12_process_document(
     // Convert C strings to Zig slices
     const x12_path = std.mem.span(x12_file_path);
     const schema_file = std.mem.span(schema_path);
-
-    // Open X12 file
-    const x12_file = std.fs.cwd().openFile(x12_path, .{}) catch |err| {
-        return @intFromEnum(errorToCode(err));
-    };
-    defer x12_file.close();
+    var x12_file = X12_File{ .file_contents = null, .file_path = x12_path };
 
     // Process document
     var json_output = document_processor.processDocument(
         allocator,
-        x12_file,
+        &x12_file,
         schema_file,
         null,
     ) catch |err| {
@@ -158,20 +154,15 @@ export fn zx12_process_document_with_schema(
 
     // Convert C string to Zig slice
     const x12_path = std.mem.span(x12_file_path);
+    var x12_file = X12_File{ .file_contents = null, .file_path = x12_path };
 
     // Extract schema from handle
     const schema_handle: *SchemaHandle = @ptrCast(@alignCast(schema));
 
-    // Open X12 file
-    const x12_file = std.fs.cwd().openFile(x12_path, .{}) catch |err| {
-        return @intFromEnum(errorToCode(err));
-    };
-    defer x12_file.close();
-
     // Process document with pre-loaded schema
     var json_output = document_processor.processDocument(
         allocator,
-        x12_file,
+        &x12_file,
         null, // schema_file not needed since we're passing the schema
         schema_handle.schema,
     ) catch |err| {
@@ -308,21 +299,48 @@ export fn zx12_process_from_memory_with_schema(
     schema: *ZX12_Schema,
     output_ptr: *?*ZX12_Output,
 ) c_int {
-    // Write X12 data to temporary file
-    const temp_filename = "temp_zx12_input.x12";
-    const file = std.fs.cwd().createFile(temp_filename, .{}) catch |err| {
+    const allocator = getGlobalAllocator();
+    var x12_file = X12_File{ .file_contents = @constCast(x12_data[0..x12_length]), .file_path = null };
+    const schema_handle: *SchemaHandle = @ptrCast(@alignCast(schema));
+    // Process document
+    var json_output = document_processor.processDocument(
+        allocator,
+        &x12_file,
+        null,
+        schema_handle.schema,
+    ) catch |err| {
         return @intFromEnum(errorToCode(err));
     };
-    defer file.close();
-    defer std.fs.cwd().deleteFile(temp_filename) catch {};
 
-    const x12_slice = x12_data[0..x12_length];
-    file.writeAll(x12_slice) catch |err| {
-        return @intFromEnum(errorToCode(err));
+    // Get the data from ArrayList
+    const length = json_output.items.len;
+
+    // Allocate buffer with room for null terminator
+    const data = allocator.alloc(u8, length + 1) catch {
+        json_output.deinit(allocator);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
     };
 
-    // Process using file-based function with schema
-    return zx12_process_document_with_schema(temp_filename, schema, output_ptr);
+    // Copy data and add null terminator
+    @memcpy(data[0..length], json_output.items);
+    data[length] = 0;
+
+    // Free the ArrayList
+    json_output.deinit(allocator);
+
+    // Create output handle
+    const handle = allocator.create(OutputHandle) catch {
+        allocator.free(data);
+        return @intFromEnum(ZX12_Error.OutOfMemory);
+    };
+
+    handle.* = .{
+        .data = data,
+        .length = length,
+    };
+
+    output_ptr.* = @ptrCast(handle);
+    return @intFromEnum(ZX12_Error.Success);
 }
 
 /// Get the version string of the zX12 library
@@ -435,14 +453,10 @@ pub fn main() !void {
 
     // Open and process document
     const file_path = "samples/837i_example.x12";
-    const file = std.fs.cwd().openFile(file_path, .{}) catch |err| {
-        std.debug.print("Failed to open file: {}\n", .{err});
-        return err;
-    };
-    defer file.close();
+    var x12_file = X12_File{ .file_contents = null, .file_path = file_path };
 
     std.debug.print("\n=== Processing 837i sample to debug segment tracking ===\n", .{});
-    var result = document_processor.processDocument(allocator, file, null, schema) catch |err| {
+    var result = document_processor.processDocument(allocator, &x12_file, null, schema) catch |err| {
         std.debug.print("Failed to process document: {}\n", .{err});
         return err;
     };

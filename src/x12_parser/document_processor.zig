@@ -14,22 +14,72 @@ const JsonValue = json_builder.JsonValue;
 const JsonObject = json_builder.JsonObject;
 const JsonArray = json_builder.JsonArray;
 
+pub const X12_File = struct {
+    file_path: ?[]const u8,
+    file_contents: ?[]u8,
+    owned: bool = false,
+
+    /// Load file contents into memory
+    /// Non-op if contents are already loaded
+    pub fn loadContents(self: *X12_File, allocator: std.mem.Allocator) !void {
+        if (self.file_contents != null) {
+            return;
+        }
+        if (self.file_path) |path| {
+            var file: std.fs.File = undefined;
+            const is_absoulte = std.fs.path.isAbsolute(path);
+            switch (is_absoulte) {
+                true => {
+                    file = try std.fs.openFileAbsolute(path, .{
+                        .mode = .read_only,
+                    });
+                },
+                false => {
+                    file = try std.fs.cwd().openFile(path, .{
+                        .mode = .read_only,
+                    });
+                },
+            }
+            defer file.close();
+            const file_sz = try file.getEndPos();
+            self.file_contents = try allocator.alloc(u8, file_sz);
+            const read_sz = try file.readAll(self.file_contents.?);
+            if (read_sz != file_sz) {
+                return std.fs.File.ReadError.Unexpected;
+            }
+            self.owned = true;
+        } else {
+            return std.fs.File.OpenError.FileNotFound;
+        }
+    }
+
+    pub fn deinit(self: @This(), allocator: std.mem.Allocator) void {
+        if (!self.owned) return;
+        if (self.file_contents) |contents| {
+            allocator.free(contents);
+        }
+    }
+};
+
 /// Process X12 document and convert to JSON
 pub fn processDocument(
     allocator: std.mem.Allocator,
-    x12_file_path: std.fs.File,
+    x12_file: *X12_File,
     schema_path: ?[]const u8,
     schema: ?Schema,
 ) !std.ArrayList(u8) {
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const parser_allocator = arena.allocator();
-    const x12_sz = try x12_file_path.getEndPos();
-    const x12_content = try allocator.alloc(u8, x12_sz);
-    defer allocator.free(x12_content);
-    _ = try x12_file_path.readAll(x12_content);
+    defer x12_file.deinit(parser_allocator);
     // Parse X12 document
-    var document = try x12_parser.parse(parser_allocator, x12_content);
+    if (x12_file.file_contents == null and x12_file.file_path != null) {
+        try x12_file.loadContents(parser_allocator);
+    }
+    if (x12_file.file_contents == null) {
+        return std.fs.File.ReadError.Unexpected;
+    }
+    var document = try x12_parser.parse(parser_allocator, x12_file.file_contents.?);
     defer document.deinit();
 
     if (schema == null and schema_path == null) {
@@ -1092,10 +1142,9 @@ fn processElement(
 test "process simple X12 document" {
     const allocator = testing.allocator;
 
-    const file = try std.fs.cwd().openFile("samples/simple_test.x12", .{ .mode = .read_only });
-    defer file.close();
+    var x12_file = X12_File{ .file_contents = null, .file_path = "samples/simple_test.x12" };
     // Process document
-    var output = try processDocument(allocator, file, "schema/837p.json", null);
+    var output = try processDocument(allocator, &x12_file, "schema/837p.json", null);
     defer output.deinit(allocator);
 
     // Check output contains expected fields
@@ -1107,15 +1156,9 @@ test "process simple X12 document" {
 
 test "process document with HL hierarchy" {
     const allocator = testing.allocator;
-    const x12_file = try std.fs.cwd().openFile(
-        "samples/837p_example.x12",
-        .{
-            .mode = .read_only,
-        },
-    );
-    defer x12_file.close();
+    var x12_file = X12_File{ .file_contents = null, .file_path = "samples/837p_example.x12" };
     // Use existing sample file
-    var output = try processDocument(allocator, x12_file, "schema/837p.json", null);
+    var output = try processDocument(allocator, &x12_file, "schema/837p.json", null);
     defer output.deinit(allocator);
 
     // Check output contains hierarchical structure
