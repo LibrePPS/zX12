@@ -26,24 +26,34 @@ pub const X12_File = struct {
             return;
         }
         if (self.file_path) |path| {
-            var file: std.fs.File = undefined;
+            var file: std.Io.File = undefined;
+            var io_threaded: std.Io.Threaded = .init(allocator);
+            defer io_threaded.deinit();
+            const io = io_threaded.io();
+
             const is_absoulte = std.fs.path.isAbsolute(path);
             switch (is_absoulte) {
                 true => {
-                    file = try std.fs.openFileAbsolute(path, .{
-                        .mode = .read_only,
-                    });
+                    file = try std.Io.File.openAbsolute(
+                        io,
+                        path,
+                        .{
+                            .mode = .read_only,
+                        },
+                    );
                 },
                 false => {
-                    file = try std.fs.cwd().openFile(path, .{
+                    file = try std.Io.Dir.cwd().openFile(io, path, .{
                         .mode = .read_only,
                     });
                 },
             }
-            defer file.close();
-            const file_sz = try file.getEndPos();
+            defer file.close(io);
+            const file_stat = try file.stat(io);
+            const file_sz = file_stat.size;
             self.file_contents = try allocator.alloc(u8, file_sz);
-            const read_sz = try file.readAll(self.file_contents.?);
+            const read_file: std.fs.File = .{ .handle = file.handle };
+            const read_sz = try read_file.read(self.file_contents.?);
             if (read_sz != file_sz) {
                 return std.fs.File.ReadError.Unexpected;
             }
