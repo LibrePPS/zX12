@@ -255,16 +255,17 @@ export fn zx12_process_from_memory(
     schema_path: [*:0]const u8,
     output_ptr: *?*ZX12_Output,
 ) c_int {
+    var io_threaded: std.Io.Threaded = .init(getGlobalAllocator(), .{});
     // Write X12 data to temporary file
     const temp_filename = "temp_zx12_input.x12";
-    const file = std.fs.cwd().createFile(temp_filename, .{}) catch |err| {
+    const file = std.Io.Dir.cwd().createFile(io_threaded.io(), temp_filename, .{}) catch |err| {
         return @intFromEnum(errorToCode(err));
     };
-    defer file.close();
-    defer std.fs.cwd().deleteFile(temp_filename) catch {};
+    defer file.close(io_threaded.io());
+    defer std.Io.Dir.cwd().deleteFile(io_threaded.io(), temp_filename) catch {};
 
     const x12_slice = x12_data[0..x12_length];
-    file.writeAll(x12_slice) catch |err| {
+    file.writePositionalAll(io_threaded.io(), x12_slice, 0) catch |err| {
         return @intFromEnum(errorToCode(err));
     };
 

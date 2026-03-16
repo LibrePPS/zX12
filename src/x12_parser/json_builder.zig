@@ -31,9 +31,9 @@ pub const JsonArray = struct {
     items: std.ArrayList(JsonValue),
     allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) JsonArray {
+    pub fn init(allocator: std.mem.Allocator) !JsonArray {
         return JsonArray{
-            .items = std.ArrayList(JsonValue){},
+            .items = try std.ArrayList(JsonValue).initCapacity(allocator, 1),
             .allocator = allocator,
         };
     }
@@ -158,7 +158,7 @@ pub const JsonBuilder = struct {
                 } else {
                     // Create new array
                     const new_arr = try self.allocator.create(JsonArray);
-                    new_arr.* = JsonArray.init(self.allocator);
+                    new_arr.* = try JsonArray.init(self.allocator);
                     try current_obj.put(part, JsonValue{ .array = new_arr });
                     return new_arr;
                 }
@@ -392,7 +392,7 @@ test "stringify simple object" {
     try builder.set("name", JsonValue{ .string = name_str });
     try builder.set("age", JsonValue{ .number = 30 });
 
-    var output = std.ArrayList(u8){};
+    var output = try std.ArrayList(u8).initCapacity(allocator, 1);
     defer output.deinit(allocator);
 
     try builder.stringify(&output, allocator);
@@ -415,7 +415,7 @@ test "stringify nested object" {
     const last_str = try allocator.dupe(u8, "Doe");
     try builder.set("person.name.last", JsonValue{ .string = last_str });
 
-    var output = std.ArrayList(u8){};
+    var output = try std.ArrayList(u8).initCapacity(allocator, 1);
     defer output.deinit(allocator);
 
     try builder.stringify(&output, allocator);
@@ -445,7 +445,7 @@ test "stringify with array" {
     try builder.pushToArray("providers", obj1);
     try builder.pushToArray("providers", obj2);
 
-    var output = std.ArrayList(u8){};
+    var output = try std.ArrayList(u8).initCapacity(allocator, 1);
     defer output.deinit(allocator);
 
     try builder.stringify(&output, allocator);

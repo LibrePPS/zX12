@@ -27,14 +27,14 @@ pub const X12_File = struct {
         }
         if (self.file_path) |path| {
             var file: std.Io.File = undefined;
-            var io_threaded: std.Io.Threaded = .init(allocator);
+            var io_threaded: std.Io.Threaded = .init(allocator, .{});
             defer io_threaded.deinit();
             const io = io_threaded.io();
 
             const is_absoulte = std.fs.path.isAbsolute(path);
             switch (is_absoulte) {
                 true => {
-                    file = try std.Io.File.openAbsolute(
+                    file = try std.Io.Dir.openFileAbsolute(
                         io,
                         path,
                         .{
@@ -52,14 +52,14 @@ pub const X12_File = struct {
             const file_stat = try file.stat(io);
             const file_sz = file_stat.size;
             self.file_contents = try allocator.alloc(u8, file_sz);
-            const read_file: std.fs.File = .{ .handle = file.handle };
-            const read_sz = try read_file.read(self.file_contents.?);
+            const read_file: std.Io.File = .{ .handle = file.handle, .flags = .{ .nonblocking = true } };
+            const read_sz = try read_file.readPositionalAll(io, self.file_contents.?, 0);
             if (read_sz != file_sz) {
-                return std.fs.File.ReadError.Unexpected;
+                return std.Io.File.Reader.Error.Unexpected;
             }
             self.owned = true;
         } else {
-            return std.fs.File.OpenError.FileNotFound;
+            return std.Io.File.OpenError.FileNotFound;
         }
     }
 
@@ -87,7 +87,7 @@ pub fn processDocument(
         try x12_file.loadContents(parser_allocator);
     }
     if (x12_file.file_contents == null) {
-        return std.fs.File.ReadError.Unexpected;
+        return std.Io.File.Reader.Error.Unexpected;
     }
     var document = try x12_parser.parse(parser_allocator, x12_file.file_contents.?);
     defer document.deinit();
@@ -120,7 +120,7 @@ pub fn processDocument(
     try processTrailer(&builder, &document, &schema_to_use.?, parser_allocator);
 
     // Stringify JSON
-    var output = std.ArrayList(u8){};
+    var output = try std.ArrayList(u8).initCapacity(allocator, 1);
     try builder.stringify(&output, allocator); //<--Use the callers allocator here so they own memorys
 
     if (schema == null) {
@@ -291,7 +291,7 @@ fn processHLNode(
                 // Add child array to parent object if it doesn't exist
                 if (node_obj.get(child_array_name) == null) {
                     const child_array = try allocator.create(JsonArray);
-                    child_array.* = JsonArray.init(allocator);
+                    child_array.* = try JsonArray.init(allocator);
                     try node_obj.put(child_array_name, JsonValue{ .array = child_array });
                 }
 
@@ -368,7 +368,7 @@ fn processHLNode(
                             // Add grandchild array to child object if it doesn't exist
                             if (child_obj.get(grandchild_array_name) == null) {
                                 const grandchild_array = try allocator.create(JsonArray);
-                                grandchild_array.* = JsonArray.init(allocator);
+                                grandchild_array.* = try JsonArray.init(allocator);
                                 try child_obj.put(grandchild_array_name, JsonValue{ .array = grandchild_array });
                             }
 
@@ -679,7 +679,7 @@ fn processNonHierarchicalLoop(
             } else {
                 // Create new array with this object
                 const new_array_ptr = try allocator.create(JsonArray);
-                new_array_ptr.* = JsonArray.init(allocator);
+                new_array_ptr.* = try JsonArray.init(allocator);
                 try new_array_ptr.append(loop_value);
                 try parent_obj.put(loop.output_array, JsonValue{ .array = new_array_ptr });
             }
@@ -746,7 +746,7 @@ fn processRepeatingElements(
         std.log.debug("Element {d}: '{s}'", .{ elem_idx, element_value });
 
         // Split the element by the separator to get composite components
-        var components = std.ArrayList([]const u8){};
+        var components = try std.ArrayList([]const u8).initCapacity(allocator, 1);
         defer components.deinit(allocator);
 
         var iter = std.mem.splitSequence(u8, element_value, rep_config.separator);
@@ -809,7 +809,7 @@ fn processRepeatingElements(
                 // Create new array
                 std.log.debug("Creating new array '{s}'", .{pattern.output_array});
                 const new_array_ptr = try allocator.create(JsonArray);
-                new_array_ptr.* = JsonArray.init(allocator);
+                new_array_ptr.* = try JsonArray.init(allocator);
                 try new_array_ptr.append(JsonValue{ .object = elem_obj_ptr });
                 try obj.put(pattern.output_array, JsonValue{ .array = new_array_ptr });
             }

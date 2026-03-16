@@ -103,7 +103,7 @@ pub const HLTree = struct {
 
     /// Get all nodes at a specific level code (e.g., all "22" subscribers)
     pub fn getNodesByLevel(self: HLTree, allocator: std.mem.Allocator, level_code: []const u8) ![]HLNode {
-        var matches = std.ArrayList(HLNode){};
+        var matches = try std.ArrayList(HLNode).initCapacity(allocator, 1);
         errdefer matches.deinit(allocator);
 
         for (self.roots) |root| {
@@ -185,7 +185,7 @@ pub fn buildTree(allocator: std.mem.Allocator, doc: x12_parser.X12Document) !HLT
             .hl_segment_index = hl.index,
             .segment_start = segment_start,
             .segment_end = segment_end,
-            .children = std.ArrayList([]const u8){},
+            .children = try std.ArrayList([]const u8).initCapacity(allocator, 1),
             .allocator = allocator,
         };
 
@@ -206,7 +206,7 @@ pub fn buildTree(allocator: std.mem.Allocator, doc: x12_parser.X12Document) !HLT
     }
 
     // Step 4: Build the actual tree starting from roots
-    var roots = std.ArrayList(HLNode){};
+    var roots = try std.ArrayList(HLNode).initCapacity(allocator, 1);
     errdefer {
         for (roots.items) |*root| {
             root.deinit();
@@ -259,7 +259,7 @@ fn buildNodeRecursive(
 ) !HLNode {
     const builder = node_map.get(id) orelse return error.NodeNotFound;
 
-    var children = std.ArrayList(HLNode){};
+    var children = try std.ArrayList(HLNode).initCapacity(allocator, 1);
     errdefer {
         for (children.items) |*child| {
             child.deinit();

@@ -63,7 +63,7 @@ pub const Segment = struct {
             return null; // Not a composite element
         }
 
-        var components = std.ArrayList([]const u8){};
+        var components = try std.ArrayList([]const u8).initCapacity(allocator, 1);
         errdefer components.deinit(allocator);
 
         var iter = std.mem.splitAny(u8, element, &[_]u8{composite_sep});
@@ -87,7 +87,7 @@ pub const Segment = struct {
             return null; // Not a repeated element
         }
 
-        var repetitions = std.ArrayList([]const u8){};
+        var repetitions = try std.ArrayList([]const u8).initCapacity(allocator, 1);
         errdefer repetitions.deinit(allocator);
 
         var iter = std.mem.splitAny(u8, element, &[_]u8{repetition_sep});
@@ -130,7 +130,7 @@ pub const X12Document = struct {
 
     /// Find all segments with the given ID
     pub fn findAllSegments(self: X12Document, allocator: std.mem.Allocator, segment_id: []const u8) ![]Segment {
-        var matches = std.ArrayList(Segment){};
+        var matches = try std.ArrayList(Segment).initCapacity(allocator, 1);
         errdefer matches.deinit(allocator);
 
         for (self.segments) |segment| {
@@ -176,7 +176,7 @@ pub const X12Document = struct {
 pub fn parse(allocator: std.mem.Allocator, content: []const u8) !X12Document {
     // Step 1: Remove newlines and carriage returns from content
     // X12 files may have newlines added for readability, but they're not part of the standard
-    var cleaned_content = std.ArrayList(u8){};
+    var cleaned_content = try std.ArrayList(u8).initCapacity(allocator, 1);
     defer cleaned_content.deinit(allocator);
 
     for (content) |c| {
@@ -192,7 +192,7 @@ pub fn parse(allocator: std.mem.Allocator, content: []const u8) !X12Document {
     const delimiters = try detectDelimiters(clean_data);
 
     // Step 3: Split into segments
-    var segments = std.ArrayList(Segment){};
+    var segments = try std.ArrayList(Segment).initCapacity(allocator, 1);
     errdefer {
         for (segments.items) |segment| {
             allocator.free(segment.elements);
@@ -262,7 +262,7 @@ fn parseSegment(
     delimiters: Delimiters,
     index: usize,
 ) !Segment {
-    var elements = std.ArrayList([]const u8){};
+    var elements = try std.ArrayList([]const u8).initCapacity(allocator, 1);
     errdefer elements.deinit(allocator);
 
     var element_iter = std.mem.splitAny(u8, segment_text, &[_]u8{delimiters.element});

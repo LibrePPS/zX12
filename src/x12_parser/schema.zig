@@ -325,8 +325,9 @@ pub const Schema = struct {
 
 /// Load schema from JSON file
 pub fn loadSchema(allocator: std.mem.Allocator, file_path: []const u8) !Schema {
+    var io_threaded = std.Io.Threaded.init(allocator, .{});
     // Read file
-    const content = try std.fs.cwd().readFileAlloc(file_path, allocator, @enumFromInt(10 * 1024 * 1024)); // 10MB max
+    const content = try std.Io.Dir.cwd().readFileAlloc(io_threaded.io(), file_path, allocator, @enumFromInt(10 * 1024 * 1024)); // 10MB max
     // Don't free content - we need it for string references
     // It will be kept alive during schema lifetime
 
